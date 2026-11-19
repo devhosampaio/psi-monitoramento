@@ -1,6 +1,6 @@
 /* =========================================================
    PAINEL DE MONITORAMENTO — aplicação
-   Fontes: Google Sheets API v4
+   Frontend estático + backend Google Apps Script
    ========================================================= */
 
 const $ = (id) => document.getElementById(id);
@@ -483,7 +483,7 @@ function renderIndividual(source) {
   if (result.error && !result.records) {
     showNotice(`${source.name}: ${errorMessage(new Error(result.error))}`, "warning");
     $("metrics").innerHTML = "";
-    $("widgets").innerHTML = '<div class="empty-state"><span class="empty-icon">⌁</span><strong>Não foi possível carregar os dados</strong><p>Confira a chave de API, as permissões da planilha e o intervalo informado.</p></div>';
+    $("widgets").innerHTML = '<div class="empty-state"><span class="empty-icon">⌁</span><strong>Não foi possível carregar os dados</strong><p>Confira a implantação do Apps Script, as permissões da planilha e o intervalo no Code.gs.</p></div>';
     $("filters").innerHTML = "";
     $("recordCount").textContent = "";
     return;

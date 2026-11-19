@@ -30,7 +30,6 @@
 
       <div class="side-heading">
         <span class="side-label">PRODUTOS MONITORADOS</span>
-        <button class="icon-button add-source" id="openSource" title="Adicionar planilha" aria-label="Adicionar planilha">＋</button>
       </div>
       <nav class="navigation" id="sourceNav" aria-label="Planilhas monitoradas">
         <p class="nav-empty">Nenhuma fonte adicional.</p>
@@ -57,8 +56,7 @@
           <p class="eyebrow" id="pageEyebrow">CENTRAL DE ACOMPANHAMENTO</p>
           <h1 id="pageTitle">Visão consolidada</h1>
           <p class="page-description" id="pageDescription">Acompanhe os indicadores de todas as planilhas em um só lugar.</p>
-        </div>
-        <button class="button button-primary" id="addSourceHeading">＋ Adicionar planilha</button>
+        </div><span class="updated-label">Atualização automática · 30 s</span>
       </section>
 
       <section class="notice notice-info" id="notice" hidden aria-live="polite"></section>
@@ -90,30 +88,9 @@
         </div>
       </section>
 
-      <footer class="footer"><span>Monitoramento integrado</span><span>Dados atualizados automaticamente a cada minuto</span></footer>
+      <footer class="footer"><span>Monitoramento integrado</span><span>Dados atualizados automaticamente a cada 30 segundos</span></footer>
     </main>
   </div>
 
-  <dialog class="modal" id="sourceModal">
-    <form method="dialog" class="modal-card" id="sourceForm">
-      <div class="modal-header"><div><p class="eyebrow">NOVA FONTE DE DADOS</p><h2 id="sourceModalTitle">Adicionar planilha</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
-      <label class="form-field"><span>Nome do produto ou planilha</span><input id="sourceName" required maxlength="70" placeholder="Ex.: Cisternas, PAPs, Passagens Molhadas"></label>
-      <label class="form-field"><span>Link ou ID da planilha Google</span><input id="sourceId" required placeholder="Cole o link completo ou o ID"></label>
-      <label class="form-field"><span>Aba e intervalo</span><input id="sourceRange" required placeholder="Ex.: Principal!A1:AL"></label>
-      <label class="form-field"><span>Perfil de leitura</span><select id="sourceProfile"><option value="auto">Automático — detectar colunas</option><option value="pap">Controle de PAPs — estrutura padrão</option></select></label>
-      <p class="form-help">A primeira linha do intervalo precisa conter os cabeçalhos. Para o perfil PAPs, use a aba e a estrutura de colunas esperadas pelo modelo.</p>
-      <div class="modal-actions"><button class="button button-quiet" value="cancel">Cancelar</button><button class="button button-primary" id="saveSource" value="default">Salvar fonte</button></div>
-    </form>
-  </dialog>
-
-  <dialog class="modal" id="settingsModal">
-    <form method="dialog" class="modal-card">
-      <div class="modal-header"><div><p class="eyebrow">PREFERÊNCIAS DO SISTEMA</p><h2>Configurações</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
-      <label class="form-field"><span>Chave da API do Google Sheets</span><input id="apiKey" type="password" autocomplete="off" placeholder="Cole sua chave de API"></label>
-      <p class="form-help">A chave é armazenada neste navegador. Restrinja-a no Google Cloud à API Google Sheets e aos domínios autorizados. Não use uma chave irrestrita em um site público.</p>
-      <label class="form-field"><span>Intervalo de atualização</span><select id="pollInterval"><option value="60000">1 minuto</option><option value="120000">2 minutos</option><option value="300000">5 minutos</option><option value="600000">10 minutos</option></select></label>
-      <div class="modal-actions"><button class="button button-quiet" value="cancel">Fechar</button><button class="button button-primary" id="saveSettings" value="default">Salvar configurações</button></div>
-    </form>
-  </dialog>
-</body>
+  </body>
 </html>
