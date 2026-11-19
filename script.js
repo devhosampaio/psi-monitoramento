@@ -57,7 +57,7 @@ const PAP_PROFILE = {
     parcelas: { label: "Quantidade de parcelas", index: 36, type: "number" },
     observacoes: { label: "Observações", index: 37, type: "multi" }
   },
-  filters: ["territorio", "municipio", "lote", "cadeiaCarta", "genero", "agroprocessamento", "equipe", "analista", "status", "situacaoAnalise", "parecer", "dataEnvio", "dataPendencia", "dataRecebimento", "diasPendencia", "dataConclusao", "diasAnalise", "parcelas", "valorUnidade", "contrapartidaFinanceira", "contrapartidaMaoObra", "contrapartidaBens", "observacoes"],
+  filters: ["territorio", "municipio", "lote", "cadeiaCarta", "cadeiaPap", "genero", "agroprocessamento", "titulacao", "situacaoFundiaria", "equipe", "analista", "status", "situacaoAnalise", "parecer"],
   widgets: [
     { type: "kpi", title: "PAPs cadastrados", aggregate: "count" },
     { type: "kpi", title: "Sem classificação no status", aggregate: "count", where: { status: /^\.\.\.$/ } },
@@ -86,7 +86,7 @@ const PAP_PROFILE = {
     { type: "bar", title: "PAPs por analista", by: "analista", horizontal: true, top: 15 },
     { type: "teamSummary", title: "Acompanhamento operacional por equipe", wide: true },
     { type: "analystSummary", title: "Distribuição por analista", wide: true },
-    { type: "table", title: "Detalhamento dos PAPs", columns: ["id", "lote", "assoc", "territorio", "municipio", "cadeiaCarta", "equipe", "analista", "status", "situacaoAnalise", "parecer"], wide: true }
+    { type: "table", title: "Detalhamento dos PAPs", columns: ["id", "lote", "assoc", "territorio", "municipio", "genero", "cadeiaCarta", "cadeiaPap", "agroprocessamento", "titulacao", "situacaoFundiaria", "familiasCarta", "mulheresCarta", "jovensCarta", "familiasPap", "mulheresPap", "jovensPap", "valorUnidade", "proposto", "aprovado", "contrapartidaFinanceira", "contrapartidaMaoObra", "contrapartidaBens", "equipe", "analista", "status", "dataEnvio", "dataPendencia", "dataRecebimento", "diasPendencia", "dataConclusao", "diasAnalise", "situacaoAnalise", "parecer", "parcelas", "observacoes"], wide: true }
   ]
 };
 
