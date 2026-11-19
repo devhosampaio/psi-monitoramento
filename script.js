@@ -4,9 +4,8 @@
    ========================================================= */
 
 const $ = (id) => document.getElementById(id);
-const STORAGE_KEY = "monitoramento.sources.v2";
-const SETTINGS_KEY = "monitoramento.settings.v2";
-const POLL_DEFAULT = 60000;
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycby4l-fSskbNZEltZ29AwK03H_l-cApaTTBj6YNp6iE8QuDquzwQJ9Wb_9B1dgBRqAxbYA/exec";
+const POLL_DEFAULT = 30000;
 const NA = "(não definido)";
 const numberFormat = new Intl.NumberFormat("pt-BR");
 const moneyFormat = new Intl.NumberFormat("pt-BR", {
@@ -54,7 +53,8 @@ const PAP_PROFILE = {
 
 const state = {
   sources: [],
-  settings: { apiKey: "", pollMs: POLL_DEFAULT },
+  settings: { pollMs: POLL_DEFAULT },
+  inFlight: new Set(),
   results: new Map(),
   selectedSource: "overview",
   filters: {},
@@ -87,15 +87,8 @@ function valuesOf(record, field) {
 function compare(a, b) {
   return String(a).localeCompare(String(b), "pt-BR", { numeric: true });
 }
-function readStorage(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-}
 function saveStorage() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
-  } catch { showNotice("Não foi possível salvar as configurações neste navegador.", "warning"); }
+  // As fontes são administradas centralmente no backend (Code.gs).
 }
 function normalizeSpreadsheetId(input) {
   const value = input.trim();
@@ -213,38 +206,61 @@ function parseSheet(values, profile) {
 
 /* Camada de acesso à fonte. A interface não depende diretamente da API. */
 const SheetsSource = {
+  jsonp(params) {
+    return new Promise((resolve, reject) => {
+      if (!BACKEND_URL || BACKEND_URL.includes("COLE_A_URL")) {
+        reject(new Error("backend_not_configured"));
+        return;
+      }
+      const callbackName = `__monitoramento_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const script = document.createElement("script");
+      const timeout = window.setTimeout(() => finish(new Error("timeout")), 25000);
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        delete window[callbackName];
+        script.remove();
+      };
+      const finish = (error, payload) => {
+        cleanup();
+        if (error) reject(error);
+        else if (!payload || payload.ok !== true) reject(new Error(payload?.error || "backend_error"));
+        else resolve(payload);
+      };
+      window[callbackName] = (payload) => finish(null, payload);
+      const url = new URL(BACKEND_URL);
+      Object.entries({ ...params, callback: callbackName }).forEach(([key, value]) => url.searchParams.set(key, value));
+      script.onerror = () => finish(new Error("network"));
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
+  },
+  async list() {
+    const payload = await this.jsonp({ action: "sources" });
+    return payload.sources || [];
+  },
   async fetch(source) {
-    if (!state.settings.apiKey) throw new Error("missing_key");
-    const url = new URL(
-      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(source.spreadsheetId)}/values/${encodeURIComponent(source.range)}`
-    );
-    url.searchParams.set("majorDimension", "ROWS");
-    url.searchParams.set("key", state.settings.apiKey);
-    const response = await fetch(url);
-    if (!response.ok) {
-      if (response.status === 403) throw new Error("forbidden");
-      if (response.status === 404) throw new Error("not_found");
-      if (response.status === 400) throw new Error("bad_range");
-      throw new Error("http");
-    }
-    const payload = await response.json();
+    const payload = await this.jsonp({ action: "read", id: source.id });
     return payload.values || [];
   }
 };
 
 function errorMessage(error) {
   const messages = {
-    missing_key: "Configure uma chave da API do Google Sheets em Configurações.",
-    forbidden: "Sem permissão para ler a planilha. Confira o compartilhamento e as restrições da chave de API.",
-    not_found: "Planilha não encontrada. Confira o link ou ID informado.",
-    bad_range: "Aba ou intervalo inválido. Confira o nome da aba e o intervalo.",
-    http: "O Google Sheets retornou um erro ao consultar esta fonte.",
+    backend_not_configured: "O endereço do backend ainda não foi configurado no script.js.",
+    timeout: "O backend demorou para responder. Os últimos dados foram mantidos.",
+    forbidden: "O backend não tem permissão para ler esta planilha. Confira o acesso da conta que publicou o Apps Script.",
+    not_found: "A fonte não está cadastrada no backend.",
+    bad_range: "Aba ou intervalo inválido. Confira a configuração no Code.gs.",
+    http: "O backend retornou um erro ao consultar esta fonte.",
+    backend_error: "O backend não conseguiu consultar esta fonte.",
     network: "Falha de conexão. Verifique sua internet."
   };
   return messages[error.message] || "Não foi possível atualizar esta fonte.";
 }
 
 async function loadSource(source, { quiet = false } = {}) {
+  if (state.inFlight.has(source.id)) return;
+  state.inFlight.add(source.id);
   const previous = state.results.get(source.id) || {};
   try {
     const values = await SheetsSource.fetch(source);
@@ -259,6 +275,8 @@ async function loadSource(source, { quiet = false } = {}) {
     const normalized = error.message === "Failed to fetch" ? new Error("network") : error;
     state.results.set(source.id, { ...previous, error: normalized.message, profile: previous.profile });
     if (!quiet) showNotice(`${source.name}: ${errorMessage(normalized)}`, "warning");
+  } finally {
+    state.inFlight.delete(source.id);
   }
   renderAll();
 }
@@ -361,19 +379,19 @@ function drawChart(widget, rows, profile, index) {
   const isDoughnut = widget.type === "doughnut";
   const datasets = isDoughnut
     ? [{
-        data: grouped.datasets[0]?.data || [],
-        backgroundColor: grouped.labels.map((label, i) => profile.semantic === widget.by ? semanticColor(label) : COLORS[i % COLORS.length]),
-        borderColor: "#fff", borderWidth: 2
-      }]
+      data: grouped.datasets[0]?.data || [],
+      backgroundColor: grouped.labels.map((label, i) => profile.semantic === widget.by ? semanticColor(label) : COLORS[i % COLORS.length]),
+      borderColor: "#fff", borderWidth: 2
+    }]
     : grouped.datasets.map((dataset, i) => ({
-        label: dataset.label,
-        data: dataset.data,
-        backgroundColor: widget.stack
-          ? (widget.stack === profile.semantic ? semanticColor(dataset.stackKey) : COLORS[i % COLORS.length])
-          : COLORS[index % COLORS.length],
-        borderRadius: 5,
-        maxBarThickness: 36
-      }));
+      label: dataset.label,
+      data: dataset.data,
+      backgroundColor: widget.stack
+        ? (widget.stack === profile.semantic ? semanticColor(dataset.stackKey) : COLORS[i % COLORS.length])
+        : COLORS[index % COLORS.length],
+      borderRadius: 5,
+      maxBarThickness: 36
+    }));
   const chart = new Chart(canvas, {
     type: isDoughnut ? "doughnut" : "bar",
     data: { labels: grouped.labels, datasets },
@@ -411,12 +429,12 @@ function renderTable(widget, rows, profile) {
     <h3>${escapeHTML(widget.title)} · ${numberFormat.format(rows.length)} registros${rows.length > 250 ? " (exibindo 250)" : ""}</h3>
     <div class="table-wrap"><table><thead><tr>${columns.map((key) => `<th>${escapeHTML(profile.fields[key].label)}</th>`).join("")}</tr></thead>
     <tbody>${body.map((record) => `<tr>${columns.map((key) => {
-      const value = record[key];
-      if (key === profile.semantic) return `<td><span class="status-tag" style="background:${semanticColor(value || NA)}">${escapeHTML(value || "Sem status")}</span></td>`;
-      if (Array.isArray(value)) return `<td>${escapeHTML(value.join(", "))}</td>`;
-      if (profile.fields[key].type === "money") return `<td>${escapeHTML(moneyFormat.format(value || 0))}</td>`;
-      return `<td>${escapeHTML(value)}</td>`;
-    }).join("")}</tr>`).join("")}</tbody></table></div>
+    const value = record[key];
+    if (key === profile.semantic) return `<td><span class="status-tag" style="background:${semanticColor(value || NA)}">${escapeHTML(value || "Sem status")}</span></td>`;
+    if (Array.isArray(value)) return `<td>${escapeHTML(value.join(", "))}</td>`;
+    if (profile.fields[key].type === "money") return `<td>${escapeHTML(moneyFormat.format(value || 0))}</td>`;
+    return `<td>${escapeHTML(value)}</td>`;
+  }).join("")}</tr>`).join("")}</tbody></table></div>
   </article>`;
 }
 
@@ -530,7 +548,7 @@ function renderOverview() {
     const count = result.records?.length ?? "—";
     const time = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
     return `<article class="source-card" data-open-source="${escapeHTML(source.id)}" tabindex="0" role="button" aria-label="Abrir ${escapeHTML(source.name)}">
-      <div class="source-card-top"><span class="source-card-icon">▤</span><button class="icon-button source-edit" data-edit-source="${escapeHTML(source.id)}" aria-label="Editar ${escapeHTML(source.name)}">···</button></div>
+      <div class="source-card-top"><span class="source-card-icon">▤</span></div>
       <h3>${escapeHTML(source.name)}</h3><p>${source.profile === "pap" ? "Perfil de controle PAPs" : "Detecção automática de colunas"}</p>
       <div class="source-card-bottom"><span class="state-label ${status}">${label}</span><span>${numberFormat.format(count === "—" ? 0 : count)} registros · ${time}</span></div>
     </article>`;
@@ -560,77 +578,19 @@ function renderAll() {
   $("lastSync").textContent = latest ? `Última leitura: ${new Date(latest).toLocaleTimeString("pt-BR")}` : "Sem sincronização";
 }
 
-function openSourceModal(source = null) {
-  state.editingId = source?.id || null;
-  $("sourceModalTitle").textContent = source ? "Editar planilha" : "Adicionar planilha";
-  $("sourceName").value = source?.name || "";
-  $("sourceId").value = source?.spreadsheetId || "";
-  $("sourceRange").value = source?.range || "";
-  $("sourceProfile").value = source?.profile || "auto";
-  $("sourceModal").showModal();
-}
-function saveSourceFromForm(event) {
-  event.preventDefault();
-  const name = $("sourceName").value.trim();
-  const spreadsheetId = normalizeSpreadsheetId($("sourceId").value);
-  const range = $("sourceRange").value.trim();
-  const profile = $("sourceProfile").value;
-  if (!name || !spreadsheetId || !range) return;
-  if (state.editingId) {
-    const source = state.sources.find((item) => item.id === state.editingId);
-    if (source) Object.assign(source, { name, spreadsheetId, range, profile });
-    stopSource(state.editingId);
-    state.results.delete(state.editingId);
-  } else {
-    const source = { id: makeId(), name, spreadsheetId, range, profile };
-    state.sources.push(source);
-  }
-  saveStorage();
-  $("sourceModal").close();
-  showNotice("Fonte salva. Iniciando a leitura da planilha.", "info");
-  const target = state.sources.find((item) => item.id === state.editingId) || state.sources[state.sources.length - 1];
-  state.selectedSource = target.id;
-  loadSource(target);
-  scheduleSource(target);
-  state.editingId = null;
+function handleSourceCardClick(event) {
+  const card = event.target.closest("[data-open-source]");
+  if (!card) return;
+  state.selectedSource = card.dataset.openSource;
+  state.query = "";
+  $("searchInput").value = "";
   renderAll();
 }
-function handleSourceCardClick(event) {
-  const editButton = event.target.closest("[data-edit-source]");
-  if (editButton) {
-    event.stopPropagation();
-    const source = state.sources.find((item) => item.id === editButton.dataset.editSource);
-    if (source) openSourceModal(source);
-    return;
-  }
-  const card = event.target.closest("[data-open-source]");
-  if (card) {
-    state.selectedSource = card.dataset.openSource;
-    state.query = "";
-    $("searchInput").value = "";
-    renderAll();
-  }
-}
+
 function openSettings() {
-  $("apiKey").value = state.settings.apiKey || "";
-  $("pollInterval").value = String(state.settings.pollMs);
-  $("settingsModal").showModal();
+  showNotice("A sincronização é automática a cada 30 segundos. As planilhas são configuradas pelo administrador no backend.", "info");
 }
-function saveSettings(event) {
-  event.preventDefault();
-  state.settings.apiKey = $("apiKey").value.trim();
-  state.settings.pollMs = Number($("pollInterval").value) || POLL_DEFAULT;
-  saveStorage();
-  $("settingsModal").close();
-  state.timers.forEach((timer) => clearInterval(timer));
-  state.timers.clear();
-  if (state.settings.apiKey) {
-    state.sources.forEach((source) => scheduleSource(source));
-    refreshAll();
-  } else {
-    showNotice("Chave removida. Configure uma chave válida para consultar as planilhas.", "warning");
-  }
-}
+
 function handleFilterChange(event) {
   const select = event.target.closest("[data-filter]");
   if (!select) return;
@@ -658,11 +618,7 @@ function navigate(view) {
 }
 
 function bindEvents() {
-  $("openSource").addEventListener("click", () => openSourceModal());
-  $("addSourceHeading").addEventListener("click", () => openSourceModal());
-  $("sourceForm").addEventListener("submit", saveSourceFromForm);
   $("openSettings").addEventListener("click", openSettings);
-  $("saveSettings").addEventListener("click", saveSettings);
   $("refreshAll").addEventListener("click", refreshAll);
   $("sourceCards").addEventListener("click", handleSourceCardClick);
   $("sourceCards").addEventListener("keydown", (event) => {
@@ -697,15 +653,24 @@ function bindEvents() {
   });
 }
 
-function initialize() {
-  state.sources = readStorage(STORAGE_KEY, []);
-  state.settings = { ...state.settings, ...readStorage(SETTINGS_KEY, {}) };
+async function initialize() {
+  state.settings.pollMs = POLL_DEFAULT;
   bindEvents();
   renderAll();
-  if (!state.settings.apiKey && state.sources.length) {
-    showNotice("Configure a chave da API do Google Sheets em Configurações para iniciar as consultas.", "warning");
+  if (!BACKEND_URL || BACKEND_URL.includes("COLE_A_URL")) {
+    showNotice("Configure a URL do Web App do Google Apps Script na constante BACKEND_URL, no início do script.js.", "warning");
+    $("globalStatus").textContent = "Backend não configurado";
+    return;
   }
-  if (state.sources.length) startMonitoring();
-  else showNotice("Comece adicionando uma planilha do Google Sheets. Você poderá acompanhar várias fontes em painéis individuais e em uma visão consolidada.", "info");
+  try {
+    state.sources = await SheetsSource.list();
+    renderAll();
+    if (state.sources.length) startMonitoring();
+    else showNotice("Nenhuma planilha foi cadastrada pelo administrador no backend (Code.gs).", "warning");
+  } catch (error) {
+    showNotice(`Não foi possível conectar ao backend: ${errorMessage(error)}.`, "warning");
+    $("globalStatus").textContent = "Falha no backend";
+  }
 }
+
 document.addEventListener("DOMContentLoaded", initialize);
