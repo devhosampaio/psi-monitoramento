@@ -88,48 +88,49 @@ function renderTeamTable(teams) {
 function renderPap(source) {
   const result=state.summaries.get(source.id)||{};
   $("overviewSummary").hidden=true; $("dashboardSection").hidden=false;
-  $("breadcrumbCurrent").textContent=source.name; $("pageEyebrow").textContent="ACOMPANHAMENTO DE PROJETOS"; $("pageTitle").textContent="Painel de PAPs";
-  $("pageDescription").textContent="Visão consolidada do cadastro, andamento das análises, pareceres, territórios, lotes e equipes.";
+  $("breadcrumbCurrent").textContent=source.name; $("pageEyebrow").textContent="ACOMPANHAMENTO DE PROJETOS";
+  $("pageTitle").textContent="Painel de PAPs";
+  $("pageDescription").textContent="Indicadores próprios calculados exclusivamente a partir dos registros da aba Principal.";
   if(result.error && !result.summary) {
-    $("metrics").innerHTML=""; $("widgets").innerHTML=`<div class="empty-state"><span class="empty-icon">!</span><strong>Não foi possível carregar os indicadores</strong><p>${escapeHTML(errorText({message:result.error}))}</p></div>`;
+    $("metrics").innerHTML="";
+    $("widgets").innerHTML=`<div class="empty-state"><span class="empty-icon">!</span><strong>Não foi possível carregar os indicadores</strong><p>${escapeHTML(errorText({message:result.error}))}</p></div>`;
     $("recordCount").textContent=""; return;
   }
   if(!result.summary) {
-    $("metrics").innerHTML=""; $("widgets").innerHTML='<div class="empty-state"><span class="empty-icon">◷</span><strong>Carregando indicadores</strong><p>Os dados agregados serão exibidos assim que a leitura terminar.</p></div>'; return;
+    $("metrics").innerHTML="";
+    $("widgets").innerHTML='<div class="empty-state"><span class="empty-icon">◷</span><strong>Carregando indicadores</strong><p>Os dados agregados serão exibidos assim que a leitura terminar.</p></div>'; return;
   }
   const s=result.summary,m=s.metrics||{},d=s.distributions||{};
-  const cards=[
-    metric("Total de PAPs",numberFormat.format(s.total||0),"Registros identificados"),
-    metric("Valor proposto",moneyFormat.format(m.proposed||0),"Valor total proposto"),
-    metric("Valor aprovado",moneyFormat.format(m.approved||0),"Valor total aprovado"),
-    metric("PAPs sem equipe definida",numberFormat.format(m.withoutTeam||0),"Aguardando atribuição"),
-    metric("Famílias — Carta",numberFormat.format(m.papFamiliesCarta||0),"Quantidade informada na Carta"),
-    metric("Famílias — PAP",numberFormat.format(m.papFamilies||0),"Quantidade informada no PAP"),
-    metric("Mulheres — Carta / PAP",numberFormat.format(m.womenCarta||0)+" / "+numberFormat.format(m.womenPap||0),"Quantidades separadas"),
-    metric("Jovens — Carta / PAP",numberFormat.format(m.youthCarta||0)+" / "+numberFormat.format(m.youthPap||0),"Quantidades separadas"),
-    metric("Análises em andamento",numberFormat.format(m.analysisInProgress||0),"Situação da análise"),
-    metric("Análises com pendência",numberFormat.format(m.analysisPending||0),"Situação da análise"),
-    metric("Análises concluídas",numberFormat.format(m.analysisCompleted||0),"Situação da análise"),
-    metric("Pendências ativas",numberFormat.format(m.pendingActive||0),"Notas enviadas sem recebimento registrado"),
-    metric("Aprovados",numberFormat.format(m.verdictApproved||0),"Resultado do parecer"),
-    metric("Aprovados com ressalvas",numberFormat.format(m.verdictWithReservations||0),"Resultado do parecer"),
-    metric("Reprovados",numberFormat.format(m.verdictRejected||0),"Resultado do parecer"),
-    metric("Sem situação de análise",numberFormat.format(m.withoutAnalysisStatus||0),"Campo ainda não preenchido"),
-    metric("Sem resultado de parecer",numberFormat.format(m.withoutVerdict||0),"Campo ainda não preenchido"),
-    metric("Média de dias de análise",numberFormat.format(m.averageAnalysisDays||0),"Entre envio e conclusão"),
-    metric("Média de dias com pendências",numberFormat.format(m.averagePendingDays||0),"Conforme alerta da planilha")
-  ];
-  $("metrics").innerHTML=cards.join("");
+  // Quatro indicadores prioritários: visão rápida sem transformar cada coluna em um card.
+  $("metrics").innerHTML=[
+    metric("PAPs cadastrados",numberFormat.format(s.total||0),"Total de registros na aba Principal"),
+    metric("Em análise",numberFormat.format(m.analysisInProgress||0),"Situação atual da análise"),
+    metric("Com pendências",numberFormat.format(m.analysisPending||0),"Precisam de complementação"),
+    metric("Análises concluídas",numberFormat.format(m.analysisCompleted||0),"Etapa de análise finalizada")
+  ].join("");
+
   const charts=[
-    ["Status do PAP",d.status],["Situação da análise",d.analysis],["Resultado do parecer",d.verdict],
-    ["PAPs por território",d.territory],["PAPs por lote",d.lot],["PAPs por equipe",d.team],
-    ["Cadeias produtivas",d.chain]
+    ["Status geral dos PAPs",d.status],
+    ["Situação das análises",d.analysis],
+    ["Distribuição por território",d.territory],
+    ["Distribuição por equipe",d.team]
   ];
   destroyCharts();
-  $("widgets").innerHTML=charts.map((x,i)=>distributionCard(x[0],x[1],i)).join("")+
-    renderTeamTable(s.teams)+renderDistributionTable("Distribuição por território",d.territory)+renderDistributionTable("Distribuição por lote",d.lot);
+  const comparison=`<article class="widget-card wide insight-card">
+    <div class="insight-heading"><div><h3>Dimensão dos projetos</h3><p>Comparação das quantidades informadas na Carta e no PAP.</p></div></div>
+    <div class="comparison-grid">
+      <div class="comparison-item"><span>Famílias</span><strong>${numberFormat.format(m.papFamiliesCarta||0)} <small>→</small> ${numberFormat.format(m.papFamilies||0)}</strong><small>Carta / PAP</small></div>
+      <div class="comparison-item"><span>Mulheres</span><strong>${numberFormat.format(m.womenCarta||0)} <small>→</small> ${numberFormat.format(m.womenPap||0)}</strong><small>Carta / PAP</small></div>
+      <div class="comparison-item"><span>Jovens</span><strong>${numberFormat.format(m.youthCarta||0)} <small>→</small> ${numberFormat.format(m.youthPap||0)}</strong><small>Carta / PAP</small></div>
+    </div>
+    <div class="financial-summary">
+      <div><span>Valor total proposto</span><strong>${moneyFormat.format(m.proposed||0)}</strong></div>
+      <div><span>Valor total aprovado</span><strong>${moneyFormat.format(m.approved||0)}</strong></div>
+    </div>
+  </article>`;
+  $("widgets").innerHTML=charts.map((x,i)=>distributionCard(x[0],x[1],i)).join("")+comparison;
   charts.forEach((x,i)=>drawDistribution("chart_"+i,x[1],i));
-  $("recordCount").textContent=numberFormat.format(s.total||0)+" PAPs consolidados";
+  $("recordCount").textContent=numberFormat.format(s.total||0)+" PAPs analisados";
   $("filters").innerHTML=""; $("activeFilters").innerHTML="";
   showNotice(result.error?"Última leitura mantida. A atualização mais recente falhou.":"","info");
 }
