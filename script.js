@@ -510,9 +510,9 @@ function renderAnalystSummary(rows) {
   const analysts = summarizeBy(rows.filter((row) => row.analista && row.analista !== NA), "analista");
   const rowsHtml = analysts.map(([name, total]) => {
     const assigned = rows.filter((row) => Array.isArray(row.analista) ? row.analista.includes(name) : row.analista === name);
-    const completed = assigned.filter((row) => row.situacaoAnalise === "Concluído").length;
-    const pending = assigned.filter((row) => row.situacaoAnalise === "Com pendência").length;
-    const analysis = assigned.filter((row) => row.situacaoAnalise === "Em análise").length;
+    const completed = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Concluído")).length;
+    const pending = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Com pendência")).length;
+    const analysis = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Em análise")).length;
     return `<tr><td>${escapeHTML(name)}</td><td>${total}</td><td>${analysis}</td><td>${completed}</td><td>${pending}</td></tr>`;
   }).join("");
   return `<article class="widget-card wide"><h3>Distribuição por analista</h3><div class="table-wrap"><table><thead><tr><th>Analista</th><th>PAPs atribuídos</th><th>Em análise</th><th>Concluídos</th><th>Com pendências</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="5">Sem atribuições identificadas.</td></tr>'}</tbody></table></div></article>`;
