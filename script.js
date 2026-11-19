@@ -46,16 +46,16 @@ const PAP_PROFILE = {
     status: { label: "Status do PAP", index: 25, options: ["Nota técnica enviada", "Concluído", "Em análise", "Com pendências", "..."] },
     dataEnvio: { label: "Data de envio da análise", index: 26, type: "date" },
     equipe: { label: "Equipe de análise", index: 27, options: ["Não definido", "Equipe 1", "Equipe 2", "Equipe 3", "Equipe 4", "Equipe 5"] },
-    analista: { label: "Analista", index: 28 },
-    dataPendencia: { label: "Data de envio das notas com pendências", index: 29, type: "date" },
+    analista: { label: "Analista", index: 28, type: "multi" },
+    dataPendencia: { label: "Data de envio das notas com pendências", index: 29, type: "multi" },
     dataRecebimento: { label: "Data de recebimento das pendências", index: 30, type: "date" },
     diasPendencia: { label: "Dias com pendências", index: 31, type: "number" },
-    dataConclusao: { label: "Data de conclusão da análise", index: 32, type: "date" },
+    dataConclusao: { label: "Data de conclusão da análise", index: 32, type: "multi" },
     diasAnalise: { label: "Dias da análise", index: 33, type: "number" },
     situacaoAnalise: { label: "Situação da análise", index: 34, options: ["Concluído", "Em análise", "Com pendência"] },
     parecer: { label: "Resultado do parecer", index: 35, options: ["Aprovado", "Reprovado", "Aprovado com ressalvas"] },
     parcelas: { label: "Quantidade de parcelas", index: 36, type: "number" },
-    observacoes: { label: "Observações", index: 37 }
+    observacoes: { label: "Observações", index: 37, type: "multi" }
   },
   filters: ["territorio", "municipio", "lote", "cadeiaCarta", "genero", "agroprocessamento", "equipe", "analista", "status", "situacaoAnalise", "parecer", "dataEnvio", "dataPendencia", "dataRecebimento", "diasPendencia", "dataConclusao", "diasAnalise", "parcelas", "valorUnidade", "contrapartidaFinanceira", "contrapartidaMaoObra", "contrapartidaBens", "observacoes"],
   widgets: [
@@ -484,8 +484,10 @@ function normalizedValue(value) {
 function summarizeBy(rows, field) {
   const groups = new Map();
   rows.forEach((row) => {
-    const label = normalizedValue(row[field]);
-    groups.set(label, (groups.get(label) || 0) + 1);
+    const raw = Array.isArray(row[field]) ? row[field] : [row[field]];
+    [...new Set(raw.map(normalizedValue))].filter((label) => label !== NA).forEach((label) => {
+      groups.set(label, (groups.get(label) || 0) + 1);
+    });
   });
   return [...groups.entries()].sort((a, b) => b[1] - a[1]);
 }
@@ -504,7 +506,7 @@ function renderTeamSummary(rows) {
 function renderAnalystSummary(rows) {
   const analysts = summarizeBy(rows.filter((row) => row.analista && row.analista !== NA), "analista");
   const rowsHtml = analysts.map(([name, total]) => {
-    const assigned = rows.filter((row) => row.analista === name);
+    const assigned = rows.filter((row) => Array.isArray(row.analista) ? row.analista.includes(name) : row.analista === name);
     const completed = assigned.filter((row) => row.situacaoAnalise === "Concluído").length;
     const pending = assigned.filter((row) => row.situacaoAnalise === "Com pendência").length;
     const analysis = assigned.filter((row) => row.situacaoAnalise === "Em análise").length;
