@@ -495,14 +495,14 @@ function summarizeBy(rows, field) {
   return [...groups.entries()].sort((a, b) => b[1] - a[1]);
 }
 function renderTeamSummary(rows) {
-  const teams = ["Equipe 1", "Equipe 2", "Equipe 3", "Equipe 4", "Equipe 5"];
+  const teams = ["Equipe 1", "Equipe 2", "Equipe 3", "Equipe 4", "Equipe 5", "Não definido"];
   const rowsHtml = teams.map((team) => {
     const assigned = rows.filter((row) => row.equipe === team);
     const inAnalysis = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Em análise")).length;
     const completed = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Concluído")).length;
     const pending = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Com pendência")).length;
     const awaiting = assigned.filter((row) => !row.situacaoAnalise || !row.situacaoAnalise.length).length;
-    return `<tr><td><strong>${team}</strong></td><td>${assigned.length}</td><td>${inAnalysis}</td><td>${completed}</td><td>${pending}</td><td>${awaiting}</td></tr>`;
+    return `<tr><td><strong>${team === "Não definido" ? "Sem equipe definida" : team}</strong></td><td>${assigned.length}</td><td>${inAnalysis}</td><td>${completed}</td><td>${pending}</td><td>${awaiting}</td></tr>`;
   }).join("");
   return `<article class="widget-card wide"><h3>Acompanhamento operacional por equipe</h3><div class="table-wrap"><table><thead><tr><th>Equipe</th><th>PAPs atribuídos</th><th>Em análise</th><th>Concluídos</th><th>Com pendências</th><th>Sem situação</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><p class="table-note">Contagens calculadas a partir dos campos Equipe de Análise e Situação da Análise.</p></article>`;
 }
