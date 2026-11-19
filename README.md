@@ -1,79 +1,68 @@
 # PSI Monitoramento
 
-Painel web para acompanhar planilhas do Google Sheets em uma interface consolidada.
+Painel web estático para acompanhar indicadores de planilhas Google Sheets.
 
 ## Arquitetura
 
-- **GitHub Pages:** hospeda a interface estática.
-- **Google Apps Script:** funciona como backend e lê somente as fontes cadastradas no array `SOURCES`.
-- **Sincronização:** consulta automática a cada 30 segundos, além do botão de atualização manual e de uma nova consulta quando a aba volta a ficar visível.
+- **GitHub Pages:** publica a interface.
+- **Google Apps Script:** lê a planilha privada e calcula os indicadores no servidor.
+- **Sincronização:** consulta automática a cada 30 segundos, com atualização manual e nova leitura ao retornar à aba.
 
-O GitHub Pages não executa código de servidor. Por isso, a leitura das planilhas é feita pelo Apps Script, e os visitantes não precisam inserir chave de API do Google.
-
-## Estrutura do repositório
+## Estrutura
 
 | Arquivo | Função |
 |---|---|
 | `index.html` | Estrutura da interface |
 | `style.css` | Estilos e responsividade |
-| `script.js` | Renderização, gráficos, filtros e sincronização |
-| `Code.gs` | Modelo do backend Google Apps Script |
-| `README.md` | Documentação do projeto |
+| `script.js` | Indicadores, gráficos e sincronização |
+| `Code.gs` | Modelo do backend Apps Script |
+| `README.md` | Documentação |
 
-## Endereço do painel
-
-Quando o GitHub Pages estiver habilitado para a branch `main` e a pasta `/(root)`, o endereço padrão será:
+## Painel publicado
 
 https://devhosampaio.github.io/psi-monitoramento/
 
-## Backend Google Apps Script
+## Reconstrução do painel PAP
 
-O arquivo `Code.gs` neste repositório é um **modelo de referência**. Ele contém um identificador de planilha de exemplo/placeholder para não publicar aqui os IDs reais das fontes. A versão efetivamente implantada fica no projeto do Google Apps Script.
+O painel foi reorganizado para refletir os campos atuais da aba `Principal`:
 
-Para configurar ou atualizar o backend:
+- Indicadores de quantidade de PAPs e valores propostos/aprovados;
+- Famílias, mulheres e jovens informados na Carta e no PAP, em indicadores separados;
+- Status do PAP, situação da análise e resultado do parecer, sem misturar os três conceitos;
+- Distribuições por território, lote, equipe e cadeia produtiva;
+- Indicadores de pendências ativas e médias de dias de análise/pendências;
+- Comparativo operacional das cinco equipes.
 
-1. Acesse https://script.google.com/ e abra o projeto do painel.
-2. No arquivo principal do Apps Script, configure o array `SOURCES`.
-3. Cada fonte precisa ter um `id` único, `name`, `spreadsheetId`, `range` e `profile`.
-4. O intervalo deve começar na linha que contém os cabeçalhos. A configuração PAPs atual utiliza a aba `Principal` e o intervalo iniciado em `A2`.
-5. Execute `testBackend` no editor para testar o acesso da conta às planilhas.
-6. Ao alterar o código do Apps Script, publique uma nova versão em **Implantar → Gerenciar implantações → Editar → Nova versão → Implantar**.
+Os campos de preenchimento pendente são apresentados como categorias/indicadores próprios. O painel não exibe associações, CNPJs, nomes de analistas, observações ou linhas individuais.
 
-A URL do Web App já configurada no frontend fica na constante `BACKEND_URL`, no início de `script.js`. Ela deve terminar em `/exec`. Não substitua por uma chave de API.
+## Atualizar o Google Apps Script — etapa obrigatória
 
-## Publicação no GitHub Pages
+**O código do Apps Script implantado não é atualizado automaticamente pelo GitHub.** O arquivo `Code.gs` do repositório é o modelo que precisa ser copiado para o projeto Apps Script que já está conectado ao painel.
 
-1. Abra **Settings → Pages** no repositório.
-2. Em **Build and deployment**, escolha **Deploy from a branch**.
-3. Selecione a branch `main` e a pasta `/(root)`.
-4. Salve e acompanhe a implantação na aba **Actions**.
+1. Abra https://script.google.com/ e entre no projeto usado pelo painel.
+2. Faça uma cópia de segurança do código atual.
+3. Substitua o conteúdo do arquivo principal pelo conteúdo atualizado de `Code.gs` deste repositório.
+4. No array `SOURCES`, mantenha o ID privado da planilha PAPs já utilizado no projeto. Não publique esse ID no repositório.
+5. Confirme a configuração `range: "Principal!A2:AL"` e `profile: "pap"`.
+6. Execute `testBackend`. O registro do teste deve mostrar `ok: true` e a quantidade total de PAPs, sem imprimir registros individuais.
+7. Vá em **Implantar → Gerenciar implantações → Editar → Nova versão → Implantar**. Mantenha a URL do Web App usada pelo frontend.
+8. Abra o painel e confirme se os indicadores são carregados.
 
-O GitHub Pages publica os arquivos da raiz quando essa pasta é selecionada como origem. A publicação pode levar alguns minutos após um commit.
+A versão nova do frontend espera que a ação `read` retorne `summary` (indicadores agregados). Se o Apps Script continuar retornando `values` (linhas brutas), o painel avisará que o backend está desatualizado.
 
-## Adicionar uma nova fonte
+## Segurança e privacidade
 
-No projeto do Apps Script, adicione um objeto ao array `SOURCES`. Exemplo:
+O Web App pode estar publicado como **Qualquer pessoa**. Por isso, qualquer dado retornado por ele deve ser considerado público.
 
-```js
-{
-  id: "cisternas",
-  name: "Cisternas",
-  spreadsheetId: "ID_REAL_DA_PLANILHA",
-  range: "Principal!A1:Z",
-  profile: "auto"
-}
-```
+- Para PAPs, o backend calcula totais e distribuições no servidor e devolve somente indicadores agregados.
+- Não adicione ao retorno público associações individualizadas, CNPJ, CPF, NIS, endereços, nomes, observações ou outras informações pessoais.
+- Não cadastre outras planilhas com dados pessoais no endpoint público sem antes implementar autenticação e autorização reais.
+- Não coloque IDs privados, senhas, tokens ou chaves no frontend ou neste repositório.
 
-Depois, salve e implante uma nova versão do Web App. O frontend consulta a lista de fontes ao ser carregado e exibirá a nova fonte automaticamente.
+## GitHub Pages
 
-## Segurança e privacidade — importante
+A publicação está configurada por GitHub Actions em `.github/workflows/deploy.yml`. Commits na branch `main` iniciam uma nova publicação. Acompanhe o resultado na aba **Actions**.
 
-A implantação do Apps Script configurada para **Qualquer pessoa** cria um endpoint público. Qualquer pessoa que obtenha a URL do Web App poderá solicitar os dados das fontes cadastradas em `SOURCES`. O fato de o ID da planilha não aparecer no frontend **não protege os dados**.
+## Sincronização
 
-- Não cadastre nesse endpoint público planilhas com CPF, NIS, endereços, dados de beneficiários ou outras informações pessoais/sigilosas.
-- Não coloque senhas, tokens privados ou chaves secretas no `index.html`, `style.css` ou `script.js`.
-- Para dados internos ou pessoais, é necessário implementar autenticação e autorização reais no backend antes de liberar o acesso.
-
-## Observações sobre a sincronização
-
-O intervalo padrão é `30000 ms` (30 segundos). Navegadores podem reduzir a frequência de temporizadores quando a aba fica em segundo plano; ao voltar para a aba, o painel realiza uma nova consulta.
+O frontend consulta os indicadores a cada `30000 ms` (30 segundos). Navegadores podem reduzir a frequência em abas em segundo plano; ao voltar para a página, uma nova consulta é iniciada.
