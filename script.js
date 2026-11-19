@@ -1,0 +1,711 @@
+/* =========================================================
+   PAINEL DE MONITORAMENTO — aplicação
+   Fontes: Google Sheets API v4
+   ========================================================= */
+
+const $ = (id) => document.getElementById(id);
+const STORAGE_KEY = "monitoramento.sources.v2";
+const SETTINGS_KEY = "monitoramento.settings.v2";
+const POLL_DEFAULT = 60000;
+const NA = "(não definido)";
+const numberFormat = new Intl.NumberFormat("pt-BR");
+const moneyFormat = new Intl.NumberFormat("pt-BR", {
+  style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1
+});
+const COLORS = ["#2d6f91", "#2b9870", "#d49a43", "#c85e59", "#8872bd", "#3e9eaa", "#c46d9b", "#82a64a"];
+
+const PAP_PROFILE = {
+  title: "Painel de PAPs",
+  key: "id",
+  semantic: "status",
+  fields: {
+    id: { label: "ID", match: /^ID$/ },
+    lote: { label: "Lote", match: /^Lote$/ },
+    assoc: { label: "Associação", match: /^Associa[cç][aã]o Proponente/ },
+    territorio: { label: "Território", match: /^Territ/ },
+    municipio: { label: "Município", match: /^Munic/ },
+    cadeia: { label: "Cadeia produtiva", match: /^Carta: Cadeia/ },
+    familias: { label: "Famílias", match: /^Carta: Qtd Fam/, type: "number" },
+    proposto: { label: "Valor proposto", match: /^Valor Proposto \(Total\)/, type: "money" },
+    aprovado: { label: "Valor aprovado", match: /^Valor Aprovado/, type: "money" },
+    status: { label: "Status", match: /^Status do PAP/ },
+    equipe: { label: "Equipe", match: /^Equipe de An/ },
+    analista: { label: "Analista", match: /^Analista$/, type: "multi" }
+  },
+  filters: ["territorio", "lote", "equipe", "status"],
+  widgets: [
+    { type: "kpi", title: "PAPs", aggregate: "count" },
+    { type: "kpi", title: "Em análise", aggregate: "count", where: { status: /an[aá]lise/i } },
+    { type: "kpi", title: "Concluídos", aggregate: "count", where: { status: /conclu/i } },
+    { type: "kpi", title: "Famílias (carta)", aggregate: "sum", field: "familias" },
+    { type: "kpi", title: "Valor proposto", aggregate: "sum", field: "proposto", format: "money" },
+    { type: "kpi", title: "Valor aprovado", aggregate: "sum", field: "aprovado", format: "money" },
+    { type: "pipeline", title: "Andamento geral das análises", by: "status", wide: true },
+    { type: "bar", title: "PAPs por território", by: "territorio", horizontal: true },
+    { type: "doughnut", title: "Distribuição por equipe", by: "equipe" },
+    { type: "bar", title: "PAPs por lote", by: "lote", sort: "label" },
+    { type: "bar", title: "Status por equipe", by: "equipe", stack: "status" },
+    { type: "bar", title: "Cadeias produtivas (top 10)", by: "cadeia", horizontal: true, top: 10 },
+    { type: "bar", title: "Famílias por território", by: "territorio", aggregate: "sum", field: "familias", horizontal: true },
+    { type: "bar", title: "PAPs por analista", by: "analista", horizontal: true, top: 12 },
+    { type: "table", title: "Detalhamento", columns: ["id", "lote", "assoc", "territorio", "municipio", "status", "equipe", "analista"], wide: true }
+  ]
+};
+
+const state = {
+  sources: [],
+  settings: { apiKey: "", pollMs: POLL_DEFAULT },
+  results: new Map(),
+  selectedSource: "overview",
+  filters: {},
+  query: "",
+  timers: new Map(),
+  charts: [],
+  editingId: null
+};
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[char]));
+}
+function clean(value) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  return /^selecionar/i.test(text) ? "" : text;
+}
+function toNumber(value) {
+  if (typeof value === "number") return value;
+  const normalized = String(value ?? "").replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
+  const result = Number.parseFloat(normalized);
+  return Number.isFinite(result) ? result : 0;
+}
+function valuesOf(record, field) {
+  const value = record[field];
+  if (Array.isArray(value)) return value.length ? value : [NA];
+  return value === "" || value == null ? [NA] : [String(value)];
+}
+function compare(a, b) {
+  return String(a).localeCompare(String(b), "pt-BR", { numeric: true });
+}
+function readStorage(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+function saveStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  } catch { showNotice("Não foi possível salvar as configurações neste navegador.", "warning"); }
+}
+function normalizeSpreadsheetId(input) {
+  const value = input.trim();
+  const match = value.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : value;
+}
+function makeId() {
+  return `src_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function showNotice(message, type = "info") {
+  const notice = $("notice");
+  notice.hidden = !message;
+  notice.className = `notice notice-${type}`;
+  notice.textContent = message;
+}
+function setGlobalStatus(online, label) {
+  $("globalDot").classList.toggle("online", online);
+  $("globalStatus").textContent = label;
+}
+function semanticColor(value) {
+  const text = String(value || "");
+  if (/conclu|aprov|regular/i.test(text)) return "#2b9870";
+  if (/an[aá]lise|andamento/i.test(text)) return "#d49a43";
+  if (/pend|reprov|atras/i.test(text)) return "#c85e59";
+  if (text === NA || /sem status/i.test(text)) return "#aab4bd";
+  return "#477da0";
+}
+
+/* Perfis: o perfil PAP é específico; o automático adapta-se aos cabeçalhos. */
+function buildAutomaticProfile(values) {
+  const headers = (values[0] || []).map((header) => String(header).replace(/\s+/g, " ").trim());
+  const body = values.slice(1);
+  const fields = {};
+  const categorical = [];
+  const numeric = [];
+
+  headers.forEach((header, index) => {
+    if (!header) return;
+    const column = body.map((row) => clean(row[index])).filter(Boolean);
+    const numericRatio = column.length
+      ? column.filter((item) => /^[\d.,\-R$ ]+$/.test(item)).length / column.length
+      : 0;
+    const isNumeric = numericRatio >= 0.8;
+    const key = `c${index}`;
+    fields[key] = { label: header, index, type: isNumeric ? "number" : "text" };
+    const distinct = new Set(column).size;
+    if (isNumeric) numeric.push(key);
+    else if (distinct >= 2 && distinct <= 25) categorical.push(key);
+  });
+
+  const widgets = [{ type: "kpi", title: "Registros", aggregate: "count" }];
+  numeric.slice(0, 3).forEach((field) => widgets.push({
+    type: "kpi", title: `Soma · ${fields[field].label}`, aggregate: "sum", field
+  }));
+  categorical.slice(0, 4).forEach((field) => widgets.push({
+    type: "bar", title: `Registros por ${fields[field].label}`, by: field, horizontal: true, top: 12
+  }));
+  widgets.push({ type: "table", title: "Registros", columns: Object.keys(fields).slice(0, 10), wide: true });
+
+  return {
+    title: "Painel da planilha", fields, filters: categorical.slice(0, 4),
+    widgets, key: null, semantic: null
+  };
+}
+
+function parseSheet(values, profile) {
+  if (!Array.isArray(values) || values.length < 1) {
+    return { records: [], missing: ["Cabeçalho não encontrado"] };
+  }
+  const headers = (values[0] || []).map((header) => String(header).replace(/\s+/g, " ").trim());
+  const indexes = {};
+  const missing = [];
+
+  Object.entries(profile.fields).forEach(([key, definition]) => {
+    indexes[key] = Number.isInteger(definition.index)
+      ? definition.index
+      : headers.findIndex((header) => definition.match?.test(header));
+    if (indexes[key] < 0) missing.push(definition.label);
+  });
+
+  const records = [];
+  let current = null;
+  for (const row of values.slice(1)) {
+    if (!row || !row.some((cell) => String(cell ?? "").trim())) continue;
+    const startsRecord = profile.key
+      ? indexes[profile.key] >= 0 && clean(row[indexes[profile.key]]) !== ""
+      : true;
+
+    if (startsRecord) {
+      current = {};
+      Object.entries(profile.fields).forEach(([key, definition]) => {
+        current[key] = definition.type === "multi" ? [] : "";
+      });
+      records.push(current);
+    } else if (!current) continue;
+
+    Object.entries(profile.fields).forEach(([key, definition]) => {
+      const index = indexes[key];
+      if (index < 0) return;
+      const value = clean(row[index]);
+      if (!value) return;
+      if (definition.type === "multi") {
+        if (!current[key].includes(value)) current[key].push(value);
+      } else if (current[key] === "") current[key] = value;
+    });
+  }
+
+  records.forEach((record) => {
+    Object.entries(profile.fields).forEach(([key, definition]) => {
+      if (["number", "money"].includes(definition.type)) record[key] = toNumber(record[key]);
+    });
+  });
+  return { records, missing };
+}
+
+/* Camada de acesso à fonte. A interface não depende diretamente da API. */
+const SheetsSource = {
+  async fetch(source) {
+    if (!state.settings.apiKey) throw new Error("missing_key");
+    const url = new URL(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(source.spreadsheetId)}/values/${encodeURIComponent(source.range)}`
+    );
+    url.searchParams.set("majorDimension", "ROWS");
+    url.searchParams.set("key", state.settings.apiKey);
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 403) throw new Error("forbidden");
+      if (response.status === 404) throw new Error("not_found");
+      if (response.status === 400) throw new Error("bad_range");
+      throw new Error("http");
+    }
+    const payload = await response.json();
+    return payload.values || [];
+  }
+};
+
+function errorMessage(error) {
+  const messages = {
+    missing_key: "Configure uma chave da API do Google Sheets em Configurações.",
+    forbidden: "Sem permissão para ler a planilha. Confira o compartilhamento e as restrições da chave de API.",
+    not_found: "Planilha não encontrada. Confira o link ou ID informado.",
+    bad_range: "Aba ou intervalo inválido. Confira o nome da aba e o intervalo.",
+    http: "O Google Sheets retornou um erro ao consultar esta fonte.",
+    network: "Falha de conexão. Verifique sua internet."
+  };
+  return messages[error.message] || "Não foi possível atualizar esta fonte.";
+}
+
+async function loadSource(source, { quiet = false } = {}) {
+  const previous = state.results.get(source.id) || {};
+  try {
+    const values = await SheetsSource.fetch(source);
+    const profile = source.profile === "pap" ? PAP_PROFILE : buildAutomaticProfile(values);
+    const parsed = parseSheet(values, profile);
+    state.results.set(source.id, {
+      ...previous, records: parsed.records, profile, missing: parsed.missing,
+      updatedAt: Date.now(), error: null
+    });
+    if (!quiet) showNotice(`${source.name}: dados atualizados com sucesso.`, "info");
+  } catch (error) {
+    const normalized = error.message === "Failed to fetch" ? new Error("network") : error;
+    state.results.set(source.id, { ...previous, error: normalized.message, profile: previous.profile });
+    if (!quiet) showNotice(`${source.name}: ${errorMessage(normalized)}`, "warning");
+  }
+  renderAll();
+}
+
+function scheduleSource(source) {
+  const existing = state.timers.get(source.id);
+  if (existing) clearInterval(existing);
+  const timer = setInterval(() => {
+    if (!document.hidden) loadSource(source, { quiet: true });
+  }, state.settings.pollMs);
+  state.timers.set(source.id, timer);
+}
+function stopSource(id) {
+  const timer = state.timers.get(id);
+  if (timer) clearInterval(timer);
+  state.timers.delete(id);
+}
+async function refreshAll() {
+  if (!state.sources.length) {
+    showNotice("Adicione uma planilha para iniciar o monitoramento.", "info");
+    return;
+  }
+  $("refreshAll").disabled = true;
+  $("refreshAll").textContent = "Atualizando…";
+  await Promise.all(state.sources.map((source) => loadSource(source, { quiet: true })));
+  $("refreshAll").disabled = false;
+  $("refreshAll").innerHTML = "<span>↻</span> Atualizar";
+  showNotice("Sincronização concluída. Confira o status de cada fonte.", "info");
+}
+function startMonitoring() {
+  state.sources.forEach((source) => {
+    loadSource(source, { quiet: true });
+    scheduleSource(source);
+  });
+}
+
+/* Agregações e renderização dos widgets individuais. */
+function aggregateRows(rows, widget) {
+  return widget.where
+    ? rows.filter((row) => Object.entries(widget.where).every(([field, regex]) => regex.test(String(row[field] || ""))))
+    : rows;
+}
+function groupRows(rows, widget) {
+  const groups = new Map();
+  const stacks = new Set();
+  rows.forEach((record) => {
+    valuesOf(record, widget.by).forEach((label) => {
+      const stack = widget.stack ? valuesOf(record, widget.stack)[0] : "_";
+      stacks.add(stack);
+      const group = groups.get(label) || {};
+      group[stack] = (group[stack] || 0) + (widget.aggregate === "sum" ? (record[widget.field] || 0) : 1);
+      groups.set(label, group);
+    });
+  });
+  let labels = [...groups.keys()];
+  const total = (label) => Object.values(groups.get(label)).reduce((sum, value) => sum + value, 0);
+  labels = widget.sort === "label" ? labels.sort(compare) : labels.sort((a, b) => total(b) - total(a));
+  if (widget.top) labels = labels.slice(0, widget.top);
+  const stackKeys = [...stacks].sort(compare);
+  return {
+    labels,
+    datasets: stackKeys.map((key) => ({
+      label: key === "_" ? (widget.aggregate === "sum" ? "Total" : "Registros") : key,
+      data: labels.map((label) => groups.get(label)?.[key] || 0),
+      stackKey: key
+    }))
+  };
+}
+function destroyCharts() {
+  state.charts.forEach((chart) => chart.destroy());
+  state.charts = [];
+}
+function renderMetric(title, value, detail = "") {
+  return `<article class="metric-card"><span class="metric-label">${escapeHTML(title)}</span><strong>${escapeHTML(value)}</strong><small>${escapeHTML(detail)}</small></article>`;
+}
+function renderKpi(widget, rows, profile) {
+  const filtered = aggregateRows(rows, widget);
+  const value = widget.aggregate === "sum"
+    ? filtered.reduce((sum, row) => sum + (row[widget.field] || 0), 0)
+    : filtered.length;
+  const formatted = widget.format === "money" || profile.fields[widget.field]?.type === "money"
+    ? moneyFormat.format(value)
+    : numberFormat.format(value);
+  return renderMetric(widget.title, formatted, widget.aggregate === "sum" ? "Total acumulado" : "Registros");
+}
+function renderChart(widget, rows, profile, index) {
+  const id = `chart_${index}`;
+  const isDoughnut = widget.type === "doughnut";
+  const wide = widget.wide ? " wide" : "";
+  const height = isDoughnut ? " short" : "";
+  return `<article class="widget-card${wide}"><h3>${escapeHTML(widget.title)}</h3><div class="chart-wrap${height}"><canvas id="${id}" aria-label="${escapeHTML(widget.title)}" role="img"></canvas></div></article>`;
+}
+function drawChart(widget, rows, profile, index) {
+  const canvas = $(`chart_${index}`);
+  if (!canvas || typeof Chart === "undefined") return;
+  const grouped = groupRows(rows, widget);
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue("--muted").trim();
+  const line = css.getPropertyValue("--line").trim();
+  const isDoughnut = widget.type === "doughnut";
+  const datasets = isDoughnut
+    ? [{
+        data: grouped.datasets[0]?.data || [],
+        backgroundColor: grouped.labels.map((label, i) => profile.semantic === widget.by ? semanticColor(label) : COLORS[i % COLORS.length]),
+        borderColor: "#fff", borderWidth: 2
+      }]
+    : grouped.datasets.map((dataset, i) => ({
+        label: dataset.label,
+        data: dataset.data,
+        backgroundColor: widget.stack
+          ? (widget.stack === profile.semantic ? semanticColor(dataset.stackKey) : COLORS[i % COLORS.length])
+          : COLORS[index % COLORS.length],
+        borderRadius: 5,
+        maxBarThickness: 36
+      }));
+  const chart = new Chart(canvas, {
+    type: isDoughnut ? "doughnut" : "bar",
+    data: { labels: grouped.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      indexAxis: widget.horizontal ? "y" : "x",
+      cutout: isDoughnut ? "62%" : undefined,
+      plugins: {
+        legend: { display: isDoughnut || grouped.datasets.length > 1, position: "bottom", labels: { color: muted, boxWidth: 10, usePointStyle: true, font: { size: 10 } } }
+      },
+      scales: isDoughnut ? {} : {
+        x: { stacked: !!widget.stack, ticks: { color: muted, font: { size: 10 } }, grid: { color: line } },
+        y: { stacked: !!widget.stack, beginAtZero: true, ticks: { color: muted, precision: 0, font: { size: 10 } }, grid: { color: line } }
+      }
+    }
+  });
+  state.charts.push(chart);
+}
+function renderPipeline(widget, rows, profile) {
+  const grouped = groupRows(rows, widget);
+  const values = grouped.datasets[0]?.data || [];
+  const total = values.reduce((sum, value) => sum + value, 0) || 1;
+  const items = grouped.labels.map((label, index) => ({
+    label, value: values[index], color: profile.semantic === widget.by ? semanticColor(label) : COLORS[index % COLORS.length]
+  }));
+  return `<article class="widget-card wide"><h3>${escapeHTML(widget.title)}</h3>
+    <div class="pipeline">${items.map((item) => `<span title="${escapeHTML(item.label)}: ${item.value}" style="width:${item.value / total * 100}%;background:${item.color}"></span>`).join("")}</div>
+    <div class="legend">${items.map((item) => `<span><i style="background:${item.color}"></i>${escapeHTML(item.label)} · <b>${numberFormat.format(item.value)}</b> (${Math.round(item.value / total * 100)}%)</span>`).join("")}</div>
+  </article>`;
+}
+function renderTable(widget, rows, profile) {
+  const columns = widget.columns.filter((key) => profile.fields[key]);
+  const body = rows.slice(0, 250);
+  return `<article class="widget-card${widget.wide ? " wide" : ""}">
+    <h3>${escapeHTML(widget.title)} · ${numberFormat.format(rows.length)} registros${rows.length > 250 ? " (exibindo 250)" : ""}</h3>
+    <div class="table-wrap"><table><thead><tr>${columns.map((key) => `<th>${escapeHTML(profile.fields[key].label)}</th>`).join("")}</tr></thead>
+    <tbody>${body.map((record) => `<tr>${columns.map((key) => {
+      const value = record[key];
+      if (key === profile.semantic) return `<td><span class="status-tag" style="background:${semanticColor(value || NA)}">${escapeHTML(value || "Sem status")}</span></td>`;
+      if (Array.isArray(value)) return `<td>${escapeHTML(value.join(", "))}</td>`;
+      if (profile.fields[key].type === "money") return `<td>${escapeHTML(moneyFormat.format(value || 0))}</td>`;
+      return `<td>${escapeHTML(value)}</td>`;
+    }).join("")}</tr>`).join("")}</tbody></table></div>
+  </article>`;
+}
+
+function applyFilters(rows, profile, sourceId) {
+  const selected = state.filters[sourceId] || {};
+  const query = state.query.trim().toLocaleLowerCase("pt-BR");
+  return rows.filter((record) => {
+    const matchesFilters = profile.filters.every((field) => {
+      const chosen = selected[field];
+      return !chosen || !chosen.size || valuesOf(record, field).some((value) => chosen.has(value));
+    });
+    const matchesQuery = !query || Object.values(record).flat().join(" ").toLocaleLowerCase("pt-BR").includes(query);
+    return matchesFilters && matchesQuery;
+  });
+}
+function renderFilterControls(sourceId, records, profile) {
+  const selected = state.filters[sourceId] || {};
+  $("filters").innerHTML = profile.filters.map((field) => {
+    const options = [...new Set(records.flatMap((record) => valuesOf(record, field)))].sort(compare);
+    const active = selected[field] || new Set();
+    return `<select class="filter-select" data-filter="${escapeHTML(field)}" aria-label="Filtrar por ${escapeHTML(profile.fields[field].label)}">
+      <option value="">${escapeHTML(profile.fields[field].label)} · todos</option>
+      ${options.map((option) => `<option value="${escapeHTML(option)}" ${active.has(option) ? "selected" : ""}>${escapeHTML(option)}</option>`).join("")}
+    </select>`;
+  }).join("") + (profile.filters.length ? '<button class="button button-quiet" id="clearFilters">Limpar</button>' : "");
+  renderActiveFilters(sourceId, profile);
+}
+function renderActiveFilters(sourceId, profile) {
+  const selected = state.filters[sourceId] || {};
+  const chips = [];
+  Object.entries(selected).forEach(([field, values]) => {
+    values.forEach((value) => chips.push(`<button class="filter-chip" data-remove-field="${escapeHTML(field)}" data-remove-value="${escapeHTML(value)}">${escapeHTML(profile.fields[field].label)}: ${escapeHTML(value)} ×</button>`));
+  });
+  $("activeFilters").innerHTML = chips.join("");
+}
+
+function renderIndividual(source) {
+  const result = state.results.get(source.id) || {};
+  const profile = result.profile || (source.profile === "pap" ? PAP_PROFILE : null);
+  $("overviewSummary").hidden = true;
+  $("dashboardSection").hidden = false;
+  $("breadcrumbCurrent").textContent = source.name;
+  $("pageEyebrow").textContent = "PAINEL INDIVIDUAL";
+  $("pageTitle").textContent = source.name;
+  $("pageDescription").textContent = "Indicadores, distribuição e detalhamento desta fonte de dados.";
+  if (result.error && !result.records) {
+    showNotice(`${source.name}: ${errorMessage(new Error(result.error))}`, "warning");
+    $("metrics").innerHTML = "";
+    $("widgets").innerHTML = '<div class="empty-state"><span class="empty-icon">⌁</span><strong>Não foi possível carregar os dados</strong><p>Confira a chave de API, as permissões da planilha e o intervalo informado.</p></div>';
+    $("filters").innerHTML = "";
+    $("recordCount").textContent = "";
+    return;
+  }
+  if (!profile || !result.records) {
+    $("metrics").innerHTML = "";
+    $("widgets").innerHTML = '<div class="empty-state"><span class="empty-icon">◷</span><strong>Carregando planilha</strong><p>Os dados serão exibidos assim que a primeira leitura terminar.</p></div>';
+    return;
+  }
+  if (result.missing?.length) showNotice(`Colunas não encontradas: ${result.missing.join(", ")}. Confira se o intervalo começa na linha de cabeçalho.`, "warning");
+  else showNotice("", "info");
+
+  const filtered = applyFilters(result.records, profile, source.id);
+  renderFilterControls(source.id, result.records, profile);
+  $("recordCount").textContent = `Exibindo ${numberFormat.format(filtered.length)} de ${numberFormat.format(result.records.length)} registros`;
+  const widgets = profile.widgets;
+  $("metrics").innerHTML = widgets.filter((widget) => widget.type === "kpi")
+    .map((widget) => renderKpi(widget, filtered, profile)).join("");
+  destroyCharts();
+  const chartWidgets = [];
+  $("widgets").innerHTML = widgets.filter((widget) => widget.type !== "kpi").map((widget, index) => {
+    if (widget.type === "bar" || widget.type === "doughnut") {
+      const chartIndex = chartWidgets.length;
+      chartWidgets.push({ widget, index: chartIndex });
+      return renderChart(widget, filtered, profile, chartIndex);
+    }
+    if (widget.type === "pipeline") return renderPipeline(widget, filtered, profile);
+    if (widget.type === "table") return renderTable(widget, filtered, profile);
+    return "";
+  }).join("");
+  chartWidgets.forEach(({ widget }, index) => drawChart(widget, filtered, profile, index));
+}
+
+function renderOverview() {
+  $("overviewSummary").hidden = false;
+  $("dashboardSection").hidden = true;
+  $("breadcrumbCurrent").textContent = "Visão consolidada";
+  $("pageEyebrow").textContent = "CENTRAL DE ACOMPANHAMENTO";
+  $("pageTitle").textContent = "Visão consolidada";
+  $("pageDescription").textContent = "Acompanhe os indicadores de todas as planilhas em um só lugar.";
+  const connected = state.sources.filter((source) => {
+    const result = state.results.get(source.id);
+    return result?.updatedAt && !result.error;
+  });
+  const totalRecords = state.sources.reduce((sum, source) => sum + (state.results.get(source.id)?.records?.length || 0), 0);
+  const latest = Math.max(0, ...state.sources.map((source) => state.results.get(source.id)?.updatedAt || 0));
+  $("globalMetrics").innerHTML = [
+    renderMetric("Fontes cadastradas", numberFormat.format(state.sources.length), "Planilhas monitoradas"),
+    renderMetric("Fontes conectadas", numberFormat.format(connected.length), "Com leitura concluída"),
+    renderMetric("Registros identificados", numberFormat.format(totalRecords), "Somatório das fontes"),
+    renderMetric("Última atualização", latest ? new Date(latest).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—", latest ? new Date(latest).toLocaleDateString("pt-BR") : "Aguardando sincronização")
+  ].join("");
+  $("sourceCount").textContent = `${state.sources.length} ${state.sources.length === 1 ? "fonte" : "fontes"}`;
+  if (!state.sources.length) {
+    $("sourceCards").innerHTML = `<div class="empty-state"><span class="empty-icon">▤</span><strong>Adicione sua primeira planilha</strong><p>Conecte uma fonte do Google Sheets para começar o monitoramento.</p></div>`;
+    return;
+  }
+  $("sourceCards").innerHTML = state.sources.map((source) => {
+    const result = state.results.get(source.id) || {};
+    const status = result.error ? "error" : result.updatedAt ? "online" : "";
+    const label = result.error ? "Com erro" : result.updatedAt ? "Conectada" : "Aguardando";
+    const count = result.records?.length ?? "—";
+    const time = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+    return `<article class="source-card" data-open-source="${escapeHTML(source.id)}" tabindex="0" role="button" aria-label="Abrir ${escapeHTML(source.name)}">
+      <div class="source-card-top"><span class="source-card-icon">▤</span><button class="icon-button source-edit" data-edit-source="${escapeHTML(source.id)}" aria-label="Editar ${escapeHTML(source.name)}">···</button></div>
+      <h3>${escapeHTML(source.name)}</h3><p>${source.profile === "pap" ? "Perfil de controle PAPs" : "Detecção automática de colunas"}</p>
+      <div class="source-card-bottom"><span class="state-label ${status}">${label}</span><span>${numberFormat.format(count === "—" ? 0 : count)} registros · ${time}</span></div>
+    </article>`;
+  }).join("");
+}
+
+function renderNavigation() {
+  $("sourceNav").innerHTML = state.sources.length ? state.sources.map((source) => {
+    const result = state.results.get(source.id) || {};
+    return `<button class="nav-item source-nav-item ${state.selectedSource === source.id ? "is-active" : ""}" data-view="${escapeHTML(source.id)}">
+      <span class="nav-icon">▤</span><span class="source-name">${escapeHTML(source.name)}</span><span class="source-state ${result.updatedAt && !result.error ? "online" : ""}"></span>
+    </button>`;
+  }).join("") : '<p class="nav-empty">Nenhuma fonte adicional.</p>';
+  document.querySelectorAll('[data-view="overview"]').forEach((button) => button.classList.toggle("is-active", state.selectedSource === "overview"));
+}
+function renderAll() {
+  renderNavigation();
+  if (state.selectedSource === "overview") renderOverview();
+  else {
+    const source = state.sources.find((item) => item.id === state.selectedSource);
+    if (!source) { state.selectedSource = "overview"; renderOverview(); }
+    else renderIndividual(source);
+  }
+  const allLoaded = state.sources.length > 0 && state.sources.every((source) => state.results.get(source.id)?.updatedAt);
+  setGlobalStatus(allLoaded, allLoaded ? `${state.sources.length} fonte(s) monitorada(s)` : "Verificando fontes");
+  const latest = Math.max(0, ...state.sources.map((source) => state.results.get(source.id)?.updatedAt || 0));
+  $("lastSync").textContent = latest ? `Última leitura: ${new Date(latest).toLocaleTimeString("pt-BR")}` : "Sem sincronização";
+}
+
+function openSourceModal(source = null) {
+  state.editingId = source?.id || null;
+  $("sourceModalTitle").textContent = source ? "Editar planilha" : "Adicionar planilha";
+  $("sourceName").value = source?.name || "";
+  $("sourceId").value = source?.spreadsheetId || "";
+  $("sourceRange").value = source?.range || "";
+  $("sourceProfile").value = source?.profile || "auto";
+  $("sourceModal").showModal();
+}
+function saveSourceFromForm(event) {
+  event.preventDefault();
+  const name = $("sourceName").value.trim();
+  const spreadsheetId = normalizeSpreadsheetId($("sourceId").value);
+  const range = $("sourceRange").value.trim();
+  const profile = $("sourceProfile").value;
+  if (!name || !spreadsheetId || !range) return;
+  if (state.editingId) {
+    const source = state.sources.find((item) => item.id === state.editingId);
+    if (source) Object.assign(source, { name, spreadsheetId, range, profile });
+    stopSource(state.editingId);
+    state.results.delete(state.editingId);
+  } else {
+    const source = { id: makeId(), name, spreadsheetId, range, profile };
+    state.sources.push(source);
+  }
+  saveStorage();
+  $("sourceModal").close();
+  showNotice("Fonte salva. Iniciando a leitura da planilha.", "info");
+  const target = state.sources.find((item) => item.id === state.editingId) || state.sources[state.sources.length - 1];
+  state.selectedSource = target.id;
+  loadSource(target);
+  scheduleSource(target);
+  state.editingId = null;
+  renderAll();
+}
+function handleSourceCardClick(event) {
+  const editButton = event.target.closest("[data-edit-source]");
+  if (editButton) {
+    event.stopPropagation();
+    const source = state.sources.find((item) => item.id === editButton.dataset.editSource);
+    if (source) openSourceModal(source);
+    return;
+  }
+  const card = event.target.closest("[data-open-source]");
+  if (card) {
+    state.selectedSource = card.dataset.openSource;
+    state.query = "";
+    $("searchInput").value = "";
+    renderAll();
+  }
+}
+function openSettings() {
+  $("apiKey").value = state.settings.apiKey || "";
+  $("pollInterval").value = String(state.settings.pollMs);
+  $("settingsModal").showModal();
+}
+function saveSettings(event) {
+  event.preventDefault();
+  state.settings.apiKey = $("apiKey").value.trim();
+  state.settings.pollMs = Number($("pollInterval").value) || POLL_DEFAULT;
+  saveStorage();
+  $("settingsModal").close();
+  state.timers.forEach((timer) => clearInterval(timer));
+  state.timers.clear();
+  if (state.settings.apiKey) {
+    state.sources.forEach((source) => scheduleSource(source));
+    refreshAll();
+  } else {
+    showNotice("Chave removida. Configure uma chave válida para consultar as planilhas.", "warning");
+  }
+}
+function handleFilterChange(event) {
+  const select = event.target.closest("[data-filter]");
+  if (!select) return;
+  const sourceId = state.selectedSource;
+  const field = select.dataset.filter;
+  const current = state.filters[sourceId] || (state.filters[sourceId] = {});
+  current[field] = select.value ? new Set([select.value]) : new Set();
+  const source = state.sources.find((item) => item.id === sourceId);
+  if (source) renderIndividual(source);
+}
+function handleFilterRemoval(event) {
+  const button = event.target.closest("[data-remove-field]");
+  if (!button) return;
+  const selected = state.filters[state.selectedSource] || {};
+  selected[button.dataset.removeField]?.delete(button.dataset.removeValue);
+  const source = state.sources.find((item) => item.id === state.selectedSource);
+  if (source) renderIndividual(source);
+}
+function navigate(view) {
+  state.selectedSource = view;
+  state.query = "";
+  $("searchInput").value = "";
+  renderAll();
+  $("sidebar").classList.remove("is-open");
+}
+
+function bindEvents() {
+  $("openSource").addEventListener("click", () => openSourceModal());
+  $("addSourceHeading").addEventListener("click", () => openSourceModal());
+  $("sourceForm").addEventListener("submit", saveSourceFromForm);
+  $("openSettings").addEventListener("click", openSettings);
+  $("saveSettings").addEventListener("click", saveSettings);
+  $("refreshAll").addEventListener("click", refreshAll);
+  $("sourceCards").addEventListener("click", handleSourceCardClick);
+  $("sourceCards").addEventListener("keydown", (event) => {
+    if ((event.key === "Enter" || event.key === " ") && event.target.matches("[data-open-source]")) {
+      event.preventDefault();
+      state.selectedSource = event.target.dataset.openSource;
+      renderAll();
+    }
+  });
+  $("sourceNav").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view]");
+    if (button) navigate(button.dataset.view);
+  });
+  document.querySelector('[data-view="overview"]').addEventListener("click", () => navigate("overview"));
+  $("filters").addEventListener("change", handleFilterChange);
+  $("activeFilters").addEventListener("click", handleFilterRemoval);
+  $("filters").addEventListener("click", (event) => {
+    if (event.target.id === "clearFilters") {
+      state.filters[state.selectedSource] = {};
+      const source = state.sources.find((item) => item.id === state.selectedSource);
+      if (source) renderIndividual(source);
+    }
+  });
+  $("searchInput").addEventListener("input", (event) => {
+    state.query = event.target.value;
+    const source = state.sources.find((item) => item.id === state.selectedSource);
+    if (source) renderIndividual(source);
+  });
+  $("mobileMenu").addEventListener("click", () => $("sidebar").classList.toggle("is-open"));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshAll();
+  });
+}
+
+function initialize() {
+  state.sources = readStorage(STORAGE_KEY, []);
+  state.settings = { ...state.settings, ...readStorage(SETTINGS_KEY, {}) };
+  bindEvents();
+  renderAll();
+  if (!state.settings.apiKey && state.sources.length) {
+    showNotice("Configure a chave da API do Google Sheets em Configurações para iniciar as consultas.", "warning");
+  }
+  if (state.sources.length) startMonitoring();
+  else showNotice("Comece adicionando uma planilha do Google Sheets. Você poderá acompanhar várias fontes em painéis individuais e em uma visão consolidada.", "info");
+}
+document.addEventListener("DOMContentLoaded", initialize);
