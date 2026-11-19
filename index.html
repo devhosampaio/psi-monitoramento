@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#f4f6f8">
-  <title>Monitoramento | Painel integrado</title>
+  <title>PSI Monitoramento | Painel de PAPs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -16,81 +16,45 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="#" aria-label="Painel de monitoramento">
-        <span class="brand-mark">M</span>
-        <span><strong>Monitoramento</strong><small>PAINEL INTEGRADO</small></span>
+      <a class="brand" href="#" aria-label="Painel PSI Monitoramento">
+        <span class="brand-mark">P</span>
+        <span><strong>PSI Monitoramento</strong><small>PAINEL INTEGRADO</small></span>
       </a>
-
       <div class="side-label">VISÃO GERAL</div>
       <nav class="navigation" aria-label="Navegação principal">
-        <button class="nav-item is-active" data-view="overview">
-          <span class="nav-icon">▦</span><span>Visão consolidada</span>
-        </button>
+        <button class="nav-item is-active" data-view="overview"><span class="nav-icon">▦</span><span>Visão consolidada</span></button>
       </nav>
-
-      <div class="side-heading">
-        <span class="side-label">PRODUTOS MONITORADOS</span>
-      </div>
-      <nav class="navigation" id="sourceNav" aria-label="Planilhas monitoradas">
-        <p class="nav-empty">Nenhuma fonte adicional.</p>
-      </nav>
-
+      <div class="side-heading"><span class="side-label">PRODUTOS MONITORADOS</span></div>
+      <nav class="navigation" id="sourceNav" aria-label="Planilhas monitoradas"><p class="nav-empty">Carregando fontes…</p></nav>
       <div class="sidebar-bottom">
         <div class="connection-indicator"><span class="status-dot" id="globalDot"></span><span id="globalStatus">Aguardando conexão</span></div>
         <button class="nav-item nav-settings" id="openSettings"><span class="nav-icon">⚙</span><span>Configurações</span></button>
       </div>
     </aside>
-
     <main class="main-area">
       <header class="topbar">
         <button class="icon-button mobile-menu" id="mobileMenu" aria-label="Abrir menu">☰</button>
-        <div class="breadcrumb"><span>Monitoramento</span><span class="crumb-separator">/</span><strong id="breadcrumbCurrent">Visão consolidada</strong></div>
-        <div class="topbar-actions">
-          <span class="last-sync" id="lastSync">Sem sincronização</span>
-          <button class="button button-quiet" id="refreshAll"><span>↻</span> Atualizar</button>
-        </div>
+        <div class="breadcrumb"><span>PSI Monitoramento</span><span class="crumb-separator">/</span><strong id="breadcrumbCurrent">Visão consolidada</strong></div>
+        <div class="topbar-actions"><span class="last-sync" id="lastSync">Sem sincronização</span><button class="button button-quiet" id="refreshAll"><span>↻</span> Atualizar</button></div>
       </header>
-
       <section class="page-heading">
-        <div>
-          <p class="eyebrow" id="pageEyebrow">CENTRAL DE ACOMPANHAMENTO</p>
-          <h1 id="pageTitle">Visão consolidada</h1>
-          <p class="page-description" id="pageDescription">Acompanhe os indicadores de todas as planilhas em um só lugar.</p>
-        </div><span class="updated-label">Atualização automática · 30 s</span>
+        <div><p class="eyebrow" id="pageEyebrow">CENTRAL DE ACOMPANHAMENTO</p><h1 id="pageTitle">Visão consolidada</h1><p class="page-description" id="pageDescription">Acompanhe os indicadores das fontes monitoradas.</p></div>
+        <span class="updated-label">Atualização automática · 30 s</span>
       </section>
-
       <section class="notice notice-info" id="notice" hidden aria-live="polite"></section>
-
       <section class="overview-only" id="overviewSummary">
         <div class="section-heading"><div><h2>Resumo da operação</h2><p>Indicadores agregados das fontes conectadas.</p></div><span class="updated-label" id="sourceCount">0 fontes</span></div>
-        <div class="metric-grid" id="globalMetrics">
-          <article class="metric-card"><span class="metric-label">Fontes cadastradas</span><strong>0</strong><small>Planilhas monitoradas</small></article>
-          <article class="metric-card"><span class="metric-label">Fontes conectadas</span><strong>0</strong><small>Com leitura concluída</small></article>
-          <article class="metric-card"><span class="metric-label">Registros identificados</span><strong>0</strong><small>Somatório das fontes</small></article>
-          <article class="metric-card"><span class="metric-label">Última atualização</span><strong>—</strong><small>Horário da sincronização</small></article>
-        </div>
-        <div class="section-heading section-heading-spaced"><div><h2>Produtos monitorados</h2><p>Selecione um produto para abrir seu painel individual.</p></div></div>
-        <div class="source-cards" id="sourceCards">
-          <div class="empty-state"><span class="empty-icon">▤</span><strong>Adicione sua primeira planilha</strong><p>Conecte uma fonte do Google Sheets para começar o monitoramento.</p></div>
-        </div>
+        <div class="metric-grid" id="globalMetrics"></div>
+        <div class="section-heading section-heading-spaced"><div><h2>Produtos monitorados</h2><p>Selecione um produto para abrir seu painel.</p></div></div>
+        <div class="source-cards" id="sourceCards"><div class="empty-state"><strong>Carregando fontes monitoradas</strong></div></div>
       </section>
-
       <section class="dashboard-section" id="dashboardSection">
-        <div class="toolbar">
-          <label class="search-box"><span>⌕</span><input type="search" id="searchInput" placeholder="Buscar nos registros..." aria-label="Buscar nos registros"></label>
-          <div class="filter-area" id="filters"></div>
-          <span class="record-count" id="recordCount"></span>
-        </div>
-        <div class="active-filters" id="activeFilters"></div>
+        <div class="section-heading"><div><h2>Indicadores do acompanhamento</h2><p>Os dados individuais permanecem no Google Sheets; esta página recebe somente totais e distribuições.</p></div><span class="updated-label" id="recordCount"></span></div>
         <div class="metric-grid dashboard-metrics" id="metrics"></div>
-        <div class="widget-grid" id="widgets">
-          <div class="empty-state"><span class="empty-icon">▥</span><strong>Selecione uma planilha</strong><p>Escolha um produto no menu lateral ou adicione uma nova fonte.</p></div>
-        </div>
+        <div class="widget-grid" id="widgets"><div class="empty-state"><span class="empty-icon">◷</span><strong>Selecione uma planilha</strong><p>Escolha um produto no menu lateral.</p></div></div>
       </section>
-
-      <footer class="footer"><span>Monitoramento integrado</span><span>Dados atualizados automaticamente a cada 30 segundos</span></footer>
+      <footer class="footer"><span>PSI Monitoramento</span><span>Indicadores agregados · Sincronização a cada 30 segundos</span></footer>
     </main>
   </div>
-
-  </body>
+</body>
 </html>
