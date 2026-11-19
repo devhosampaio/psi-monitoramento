@@ -438,7 +438,42 @@ function renderTable(widget, rows, profile) {
   </article>`;
 }
 
-function applyFilters(rows, profile, sourceId) {
+
+function normalizedValue(value) {
+  return clean(value).replace(/^Selecionar.*$/i, "") || NA;
+}
+function summarizeBy(rows, field) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const label = normalizedValue(row[field]);
+    groups.set(label, (groups.get(label) || 0) + 1);
+  });
+  return [...groups.entries()].sort((a, b) => b[1] - a[1]);
+}
+function renderTeamSummary(rows) {
+  const teams = ["Equipe 1", "Equipe 2", "Equipe 3", "Equipe 4", "Equipe 5"];
+  const rowsHtml = teams.map((team) => {
+    const assigned = rows.filter((row) => row.equipe === team);
+    const inAnalysis = assigned.filter((row) => row.situacaoAnalise === "Em análise").length;
+    const completed = assigned.filter((row) => row.situacaoAnalise === "Concluído").length;
+    const pending = assigned.filter((row) => row.situacaoAnalise === "Com pendência").length;
+    const awaiting = assigned.filter((row) => !row.situacaoAnalise || row.situacaoAnalise === NA).length;
+    return `<tr><td><strong>${team}</strong></td><td>${assigned.length}</td><td>${inAnalysis}</td><td>${completed}</td><td>${pending}</td><td>${awaiting}</td></tr>`;
+  }).join("");
+  return `<article class="widget-card wide"><h3>Acompanhamento operacional por equipe</h3><div class="table-wrap"><table><thead><tr><th>Equipe</th><th>PAPs atribuídos</th><th>Em análise</th><th>Concluídos</th><th>Com pendências</th><th>Sem situação</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><p class="table-note">Contagens calculadas a partir dos campos Equipe de Análise e Situação da Análise.</p></article>`;
+}
+function renderAnalystSummary(rows) {
+  const analysts = summarizeBy(rows.filter((row) => row.analista && row.analista !== NA), "analista");
+  const rowsHtml = analysts.map(([name, total]) => {
+    const assigned = rows.filter((row) => row.analista === name);
+    const completed = assigned.filter((row) => row.situacaoAnalise === "Concluído").length;
+    const pending = assigned.filter((row) => row.situacaoAnalise === "Com pendência").length;
+    const analysis = assigned.filter((row) => row.situacaoAnalise === "Em análise").length;
+    return `<tr><td>${escapeHTML(name)}</td><td>${total}</td><td>${analysis}</td><td>${completed}</td><td>${pending}</td></tr>`;
+  }).join("");
+  return `<article class="widget-card wide"><h3>Distribuição por analista</h3><div class="table-wrap"><table><thead><tr><th>Analista</th><th>PAPs atribuídos</th><th>Em análise</th><th>Concluídos</th><th>Com pendências</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="5">Sem atribuições identificadas.</td></tr>'}</tbody></table></div></article>`;
+}
+\nfunction applyFilters(rows, profile, sourceId) {
   const selected = state.filters[sourceId] || {};
   const query = state.query.trim().toLocaleLowerCase("pt-BR");
   return rows.filter((record) => {
@@ -511,6 +546,8 @@ function renderIndividual(source) {
       return renderChart(widget, filtered, profile, chartIndex);
     }
     if (widget.type === "pipeline") return renderPipeline(widget, filtered, profile);
+    if (widget.type === "teamSummary") return renderTeamSummary(filtered);
+    if (widget.type === "analystSummary") return renderAnalystSummary(filtered);
     if (widget.type === "table") return renderTable(widget, filtered, profile);
     return "";
   }).join("");
