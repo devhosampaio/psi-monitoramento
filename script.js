@@ -131,7 +131,6 @@ function renderPap(source) {
   $("widgets").innerHTML=charts.map((x,i)=>distributionCard(x[0],x[1],i)).join("")+comparison;
   charts.forEach((x,i)=>drawDistribution("chart_"+i,x[1],i));
   $("recordCount").textContent=numberFormat.format(s.total||0)+" PAPs analisados";
-  $("filters").innerHTML=""; $("activeFilters").innerHTML="";
   showNotice(result.error?"Última leitura mantida. A atualização mais recente falhou.":"","info");
 }
 function destroyCharts(){state.charts.forEach(c=>c.destroy());state.charts=[];}
