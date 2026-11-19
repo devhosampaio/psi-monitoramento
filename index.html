@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel PAPs · Principal</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--tx:#1b2430;--muted:#5d6b7c;--line:#e1e6ed;--acc:#1e4e79;--ok:#2f8f5b;--warn:#d9822b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151c;--card:#19212b;--tx:#e8edf3;--muted:#96a3b3;--line:#2a3441;--acc:#6fa8dc}}
+:root[data-theme="dark"]{--bg:#10151c;--card:#19212b;--tx:#e8edf3;--muted:#96a3b3;--line:#2a3441;--acc:#6fa8dc}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+h1{margin:0;font-size:20px}
+.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+.pill.ok{color:var(--ok)}
+main,.bar{padding:0 20px;max-width:1280px;margin:0 auto}
+main{padding-bottom:28px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding-top:6px;padding-bottom:12px}
+.dd{position:relative}
+.dd>summary,.btn{list-style:none;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:7px 14px;border-radius:99px;font:inherit;font-size:14px}
+.dd>summary::-webkit-details-marker{display:none}
+.dd b{background:var(--acc);color:#fff;border-radius:99px;padding:0 7px;margin-left:6px;font-size:12px}
+.ddl{position:absolute;z-index:5;top:calc(100% + 4px);left:0;min-width:220px;max-height:300px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.ddl label{display:flex;gap:8px;align-items:center;padding:4px 8px;cursor:pointer;white-space:nowrap}
+.src{margin:0 20px 12px;max-width:1240px}
+.src>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:8px}
+.src input,.src select{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--tx);font:inherit}
+.src summary{cursor:pointer;color:var(--muted);font-size:13px}
+.src p{font-size:12px;color:var(--muted);margin:6px 0 0}
+.banner{margin:0 20px 12px;padding:10px 14px;border-radius:8px;background:var(--card);border:1px solid var(--warn);font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi small{color:var(--muted);display:block}
+.kpi b{font-size:26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px}
+.wide{grid-column:1/-1}
+.card h3{margin:0 0 10px;font-size:15px}
+.cv{position:relative;height:300px}
+.tw{overflow-x:auto;max-height:480px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--card)}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+:root{--c1:#2563eb;--c2:#10b981;--c3:#f59e0b;--c4:#ef4444;--c5:#8b5cf6;--c6:#06b6d4;--sh:0 1px 2px rgba(16,24,40,.06),0 6px 16px rgba(16,24,40,.07)}
+body{background:radial-gradient(1100px 380px at 8% -8%,rgba(37,99,235,.16),transparent),radial-gradient(900px 380px at 100% 0,rgba(139,92,246,.14),transparent),var(--bg)}
+header{max-width:1280px;margin:0 auto;padding:22px 20px 10px}
+h1{font-size:27px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(90deg,var(--c1),var(--c5));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:7px;box-shadow:var(--sh)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.pill.ok::before{background:var(--c2);animation:pl 2s infinite}
+@keyframes pl{50%{opacity:.3}}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 80%,transparent);padding-top:10px;padding-bottom:10px;margin-bottom:12px;align-items:center}
+.fl{display:contents}
+#q{flex:1 1 240px;min-width:180px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;font-size:14px;box-shadow:var(--sh)}
+.dd>summary,.btn{border-radius:10px;box-shadow:var(--sh);transition:border-color .15s}
+.dd>summary:hover,.btn:hover,.dd[open]>summary{border-color:var(--c1)}
+.dd b{background:var(--c1)}
+.cnt{margin-left:auto;font-size:13px;color:var(--muted)}.cnt b{color:var(--tx)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;width:100%}.chips:empty{display:none}
+.chip{display:inline-flex;gap:6px;align-items:center;background:color-mix(in srgb,var(--c1) 12%,transparent);border:1px solid color-mix(in srgb,var(--c1) 35%,transparent);border-radius:99px;padding:2px 10px;font-size:12px;cursor:pointer}
+.chip::after{content:"×";font-weight:700}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.kpi{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;padding:16px 16px 14px 20px;border-radius:16px;box-shadow:var(--sh)}
+.kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--a)}
+.kpi i{font-style:normal;flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:21px;background:color-mix(in srgb,var(--a) 18%,transparent)}
+.kpi b{display:block;font-size:26px;line-height:1.1}
+.card{border-radius:16px;box-shadow:var(--sh);border-top:3px solid var(--a,var(--c1))}
+.card h3{display:flex;align-items:center;gap:8px;font-size:14px}
+.card h3::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--a,var(--c1))}
+.cv.sm{height:260px}
+tr:hover td{background:color-mix(in srgb,var(--c1) 8%,transparent)}
+.tag{display:inline-block;padding:1px 10px;border-radius:99px;font-size:12px;font-weight:600;color:#fff}
+.pipe{display:flex;height:18px;border-radius:99px;overflow:hidden;background:var(--line)}
+.pipe span{height:100%}
+.leg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+</style>
+</head>
+<body>
+<header><div><h1 id="ttl">Painel de PAPs</h1><div class="sub">Acompanhamento das análises · dados da planilha atualizados automaticamente</div></div><span class="pill" id="st">Conectando…</span></header>
+<details class="src" id="src"><summary>Fonte dos dados</summary><div>
+<input id="sid" placeholder="Link ou ID da planilha"><input id="rng" placeholder="Aba!intervalo (ex.: Principal!A2:AL)">
+<select id="prf"></select><button class="btn" id="go">Aplicar</button></div>
+<p>Para usar outra planilha: cole o link, informe aba e intervalo (a primeira linha deve ser o cabeçalho) e escolha um perfil. “Automático” detecta colunas, filtros e gráficos sozinho.</p></details>
+<div id="bn"></div>
+<div class="bar"><input id="q" type="search" placeholder="🔍 Buscar associação, município, analista…" aria-label="Buscar"><span class="fl" id="flt"></span><span class="cnt" id="cnt"></span><div class="chips" id="chips"></div></div>
+<main><div id="kpis" class="kpis"></div><div id="grid" class="grid"><div class="empty wide">Carregando dados…</div></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* ============ MÓDULO 1 · PERFIS (o que muda a cada planilha nova) ============
+   fields: chave → {l: rótulo, h: regex do cabeçalho (ou i: índice da coluna), type: text|num|money|multi}
+   key: campo que inicia um novo registro (linhas seguintes sem valor = continuação)
+   filters: campos filtráveis · widgets: kpi | bar | table                       */
+const PROFILES = {
+  pap: {
+    label: "Controle PAPs (aba Principal)", title: "Painel de PAPs",
+    spreadsheetId: "1Ves6F1Qs8ngYQgKjcf51UU1URjWXOuZBn3V4MrLTxaw", range: "Principal!A2:AL",
+    key: "id", semantic: "status",
+    fields: {
+      id: { l: "ID", h: /^ID$/ }, lote: { l: "Lote", h: /^Lote$/ },
+      assoc: { l: "Associação", h: /^Associa[cç][aã]o Proponente/ },
+      territorio: { l: "Território", h: /^Territ/ }, municipio: { l: "Município", h: /^Munic/ },
+      cadeia: { l: "Cadeia produtiva", h: /^Carta: Cadeia/ },
+      familias: { l: "Famílias", h: /^Carta: Qtd Fam/, type: "num" },
+      proposto: { l: "Valor proposto", h: /^Valor Proposto \(Total\)/, type: "money" },
+      aprovado: { l: "Valor aprovado", h: /^Valor Aprovado/, type: "money" },
+      status: { l: "Status", h: /^Status do PAP/ }, equipe: { l: "Equipe", h: /^Equipe de An/ },
+      analista: { l: "Analista", h: /^Analista$/, type: "multi" }
+    },
+    filters: ["territorio", "lote", "equipe", "status"],
+    widgets: [
+      { t: "kpi", title: "PAPs", agg: "count" },
+      { t: "kpi", title: "Em análise", agg: "count", where: { status: /an[aá]lise/i } },
+      { t: "kpi", title: "Concluídos", agg: "count", where: { status: /conclu/i } },
+      { t: "kpi", title: "Famílias (carta)", agg: "sum", field: "familias" },
+      { t: "kpi", title: "Valor proposto", agg: "sum", field: "proposto", fmt: "brl" },
+      { t: "kpi", title: "Valor aprovado", agg: "sum", field: "aprovado", fmt: "brl" },
+      { t: "pipe", title: "Andamento geral das análises", by: "status" },
+      { t: "bar", title: "PAPs por território", by: "territorio", h: 1 },
+      { t: "pie", title: "Distribuição por equipe", by: "equipe" },
+      { t: "bar", title: "PAPs por lote", by: "lote", sort: "label" },
+      { t: "bar", title: "Status por equipe", by: "equipe", stack: "status" },
+      { t: "bar", title: "Cadeias produtivas (top 10)", by: "cadeia", h: 1, top: 10 },
+      { t: "bar", title: "Famílias por território", by: "territorio", agg: "sum", field: "familias", h: 1 },
+      { t: "bar", title: "PAPs por analista", by: "analista", h: 1, top: 12 },
+      { t: "table", title: "Detalhamento", cols: ["id", "lote", "assoc", "territorio", "municipio", "status", "equipe", "analista"] }
+    ]
+  },
+  auto: { label: "Automático (qualquer planilha)", auto: true, title: "Painel", range: "" }
+};
+
+/* ============ MÓDULO 2 · UTILIDADES ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+const NA = "(não definido)";
+const nf = new Intl.NumberFormat("pt-BR");
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 });
+const clean = v => { v = String(v == null ? "" : v).replace(/\s+/g, " ").trim(); return /^selecionar/i.test(v) ? "" : v; };
+const toNum = v => { const n = parseFloat(String(v).replace(/[^\d,\-]/g, "").replace(",", ".")); return isNaN(n) ? 0 : n; };
+const vals = (r, f) => { const v = r[f]; return Array.isArray(v) ? (v.length ? v : [NA]) : [v === "" || v == null ? NA : String(v)]; };
+const cmp = (a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true });
+const reEsc = s => s.replace(/[.*+?^${}()\[\]\\|]/g, "\\$&");
+
+/* ============ MÓDULO 3 · PERFIL AUTOMÁTICO (infere campos de qualquer cabeçalho) ============ */
+function buildAuto(values) {
+  const head = (values[0] || []).map(h => String(h).replace(/\s+/g, " ").trim());
+  const body = values.slice(1), fields = {}, cats = [], nums = [];
+  head.forEach((h, i) => {
+    if (!h) return;
+    const col = body.map(r => clean(r[i])).filter(Boolean);
+    const isNum = col.length && col.filter(x => /^[\d.,\-R$ ]+$/.test(x)).length / col.length >= 0.8;
+    const k = "c" + i;
+    fields[k] = { l: h, i, type: isNum ? "num" : "text" };
+    const d = new Set(col).size;
+    if (isNum) nums.push(k); else if (d >= 2 && d <= 25) cats.push(k);
+  });
+  const keys = Object.keys(fields), w = [{ t: "kpi", title: "Registros", agg: "count" }];
+  nums.slice(0, 3).forEach(k => w.push({ t: "kpi", title: "Soma · " + fields[k].l, agg: "sum", field: k }));
+  cats.slice(0, 4).forEach(k => w.push({ t: "bar", title: "Por " + fields[k].l, by: k, h: 1, top: 12 }));
+  w.push({ t: "table", title: "Registros", cols: keys.slice(0, 8) });
+  return { auto: true, title: "Painel", key: null, fields, filters: cats.slice(0, 4), widgets: w };
+}
+
+/* ============ MÓDULO 4 · PARSER (linhas → registros tipados; agrupa linhas de continuação) ============ */
+function parse(values, P) {
+  const head = (values[0] || []).map(h => String(h).replace(/\s+/g, " ").trim());
+  const idx = {}, miss = [];
+  for (const f in P.fields) {
+    const d = P.fields[f];
+    idx[f] = d.i !== undefined ? d.i : head.findIndex(h => d.h.test(h));
+    if (idx[f] < 0) miss.push(d.l);
+  }
+  const recs = []; let cur = null;
+  for (let i = 1; i < values.length; i++) {
+    const r = values[i];
+    if (!r || !r.some(x => String(x).trim())) continue;
+    const starts = P.key ? idx[P.key] >= 0 && clean(r[idx[P.key]]) !== "" : true;
+    if (starts) { cur = {}; for (const f in P.fields) cur[f] = P.fields[f].type === "multi" ? [] : ""; recs.push(cur); }
+    else if (!cur) continue;
+    for (const f in P.fields) {
+      if (idx[f] < 0) continue;
+      const v = clean(r[idx[f]]); if (!v) continue;
+      if (P.fields[f].type === "multi") { if (!cur[f].includes(v)) cur[f].push(v); }
+      else if (cur[f] === "") cur[f] = v;
+    }
+  }
+  recs.forEach(r => { for (const f in P.fields) { const t = P.fields[f].type; if (t === "num" || t === "money") r[f] = toNum(r[f]); } });
+  return { recs, miss };
+}
+
+/* ============ MÓDULO 5 · FONTE (adaptador Google Sheets API v4 · site estático) ============
+   Para trocar a origem dos dados (CSV, JSON, outra API), reescreva só este módulo:
+   ele precisa expor init(), watch(sid, range, onData(values, timestamp), onErr({code})) e stop(). */
+const SITE = { apiKey: "COLE_SUA_CHAVE_DE_API_AQUI", pollMs: 60000 };
+const Source = {
+  timer: null, vis: null, last: 0,
+  async init() { return !!SITE.apiKey && !/^COLE_/.test(SITE.apiKey); },
+  watch(sid, range, onData, onErr) {
+    this.stop();
+    const url = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sid) + "/values/" + encodeURIComponent(range) + "?majorDimension=ROWS&key=" + encodeURIComponent(SITE.apiKey);
+    const run = async () => {
+      if (document.hidden && this.last) return;
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return onErr({ code: r.status === 403 ? "forbidden" : r.status === 404 ? "not_found" : r.status === 400 ? "bad_range" : "http" });
+        const j = await r.json(); this.last = 1;
+        onData(j.values || [], Date.now());
+      } catch (e) { onErr({ code: "network" }); }
+    };
+    run(); this.timer = setInterval(run, SITE.pollMs);
+    this.vis = () => { if (!document.hidden) run(); };
+    document.addEventListener("visibilitychange", this.vis);
+  },
+  stop() { clearInterval(this.timer); if (this.vis) document.removeEventListener("visibilitychange", this.vis); this.last = 0; }
+};
+
+/* ============ MÓDULO 6 · AGREGAÇÃO ============ */
+const Agg = {
+  rows(rows, w) {
+    return w.where ? rows.filter(r => Object.entries(w.where).every(([f, re]) => re.test(String(r[f] || "")))) : rows;
+  },
+  kpi(rows, w) {
+    const r = this.rows(rows, w);
+    return w.agg === "sum" ? r.reduce((a, x) => a + (x[w.field] || 0), 0) : r.length;
+  },
+  group(rows, w) {
+    const m = new Map(), stacks = new Set();
+    for (const r of rows) for (const k of vals(r, w.by)) {
+      const s = w.stack ? vals(r, w.stack)[0] : "_"; stacks.add(s);
+      const o = m.get(k) || {}; o[s] = (o[s] || 0) + (w.agg === "sum" ? r[w.field] || 0 : 1); m.set(k, o);
+    }
+    let keys = [...m.keys()];
+    const tot = k => Object.values(m.get(k)).reduce((a, b) => a + b, 0);
+    keys = w.sort === "label" ? keys.sort(cmp) : keys.sort((a, b) => tot(b) - tot(a));
+    if (w.top) keys = keys.slice(0, w.top);
+    const ss = [...stacks].sort(cmp);
+    return { keys, sets: ss.map(s => [s === "_" ? (w.agg === "sum" ? "Total" : "PAPs") : s, keys.map(k => m.get(k)[s] || 0)]) };
+  }
+};
+
+/* ============ MÓDULO 7 · WIDGETS (registro: adicione tipos novos aqui) ============ */
+const PAL = ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
+const ACCX = ["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#06b6d4", "#ec4899"];
+/* cor semântica de status: verde=concluído, âmbar=em análise, vermelho=pendência, cinza=sem status */
+const sem = s => /conclu|aprov|regular/i.test(s) ? "#10b981" : /an[aá]lise|andamento/i.test(s) ? "#f59e0b" : /pend|reprov|atras/i.test(s) ? "#ef4444" : (s === NA || /sem status/i.test(s)) ? "#94a3b8" : "#3b82f6";
+const charts = [];
+const Widgets = {
+  kpi: (w, rows, P, n) => {
+    const v = Agg.kpi(rows, w);
+    const ic = w.icon || (/an[aá]lise/i.test(w.title) ? "⏳" : /conclu/i.test(w.title) ? "✅" : /fam|pess/i.test(w.title) ? "👥" : /valor|r\$/i.test(w.title) ? "💰" : /pap|regist/i.test(w.title) ? "📋" : "📊");
+    const a = /an[aá]lise|conclu|pend/i.test(w.title) ? sem(w.title) : ACCX[n % ACCX.length];
+    return { slot: "kpis", html: '<div class="kpi" style="--a:' + a + '"><i>' + ic + '</i><div><small>' + esc(w.title) + "</small><b>" + (w.fmt === "brl" || (w.field && P.fields[w.field].type === "money") ? brl.format(v) : nf.format(v)) + "</b></div></div>" };
+  },
+  bar: (w, rows, P, n) => {
+    const id = "ch" + n, a = ACCX[n % ACCX.length];
+    return {
+      slot: "grid", html: '<div class="card" style="--a:' + a + '"><h3>' + esc(w.title) + '</h3><div class="cv"><canvas id="' + id + '"></canvas></div></div>',
+      draw() {
+        const g = Agg.group(rows, w), css = getComputedStyle(document.documentElement);
+        const mu = css.getPropertyValue("--muted").trim(), ln = css.getPropertyValue("--line").trim();
+        charts.push(new Chart($(id), {
+          type: "bar",
+          data: { labels: g.keys, datasets: g.sets.map((s, i) => ({ label: s[0] === NA && w.stack === P.semantic ? "Sem status" : s[0], data: s[1], backgroundColor: w.stack ? (w.stack === P.semantic ? sem(s[0]) : PAL[i % PAL.length]) : a, borderRadius: 6, maxBarThickness: 38 })) },
+          options: {
+            indexAxis: w.h ? "y" : "x", responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { display: g.sets.length > 1, position: "bottom", labels: { color: mu } } },
+            scales: {
+              x: { stacked: !!w.stack, ticks: { color: mu }, grid: { color: ln } },
+              y: { stacked: !!w.stack, beginAtZero: true, ticks: { color: mu, precision: 0 }, grid: { color: ln } }
+            }
+          }
+        }));
+      }
+    };
+  },
+  pie: (w, rows, P, n) => {
+    const id = "ch" + n;
+    return {
+      slot: "grid", html: '<div class="card" style="--a:#8b5cf6"><h3>' + esc(w.title) + '</h3><div class="cv sm"><canvas id="' + id + '"></canvas></div></div>',
+      draw() {
+        const g = Agg.group(rows, w), sm = w.by === P.semantic, css = getComputedStyle(document.documentElement);
+        charts.push(new Chart($(id), { type: "doughnut", data: { labels: g.keys.map(k => k === NA && sm ? "Sem status" : k), datasets: [{ data: g.sets[0][1], backgroundColor: g.keys.map((k, i) => sm ? sem(k) : PAL[i % PAL.length]), borderWidth: 2, borderColor: css.getPropertyValue("--card").trim() }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: "60%", plugins: { legend: { position: "bottom", labels: { color: css.getPropertyValue("--muted").trim() } } } } }));
+      }
+    };
+  },
+  pipe: (w, rows, P) => {
+    const g = Agg.group(rows, w), sm = w.by === P.semantic, vs = g.sets[0][1], tot = vs.reduce((a, b) => a + b, 0) || 1;
+    const sg = g.keys.map((k, i) => ({ l: k === NA && sm ? "Sem status" : k, v: vs[i], c: sm ? sem(k) : PAL[i % PAL.length] }));
+    return { slot: "grid", html: '<div class="card wide" style="--a:#2563eb"><h3>' + esc(w.title) + '</h3><div class="pipe">' + sg.map(s => '<span title="' + esc(s.l) + '" style="width:' + (s.v / tot * 100) + '%;background:' + s.c + '"></span>').join("") + '</div><div class="leg">' + sg.map(s => '<span><i style="background:' + s.c + '"></i>' + esc(s.l) + " · <b>" + nf.format(s.v) + "</b> (" + Math.round(s.v / tot * 100) + "%)</span>").join("") + "</div></div>" };
+  },
+  table: (w, rows, P) => {
+    const cap = rows.slice(0, 200);
+    return {
+      slot: "grid", html: '<div class="card wide"><h3>' + esc(w.title) + " · " + nf.format(rows.length) + (rows.length > 200 ? " (exibindo 200)" : "") + '</h3><div class="tw"><table><tr>' +
+        w.cols.map(c => "<th>" + esc(P.fields[c].l) + "</th>").join("") + "</tr>" +
+        cap.map(r => "<tr>" + w.cols.map(c => c === P.semantic ? '<td><span class="tag" style="background:' + sem(r[c] || NA) + '">' + esc(r[c] || "Sem status") + "</span></td>" : "<td>" + esc(Array.isArray(r[c]) ? r[c].join(", ") : (P.fields[c].type === "money" ? brl.format(r[c]) : r[c])) + "</td>").join("") + "</tr>").join("") + "</table></div></div>"
+    };
+  }
+};
+
+/* ============ MÓDULO 8 · FILTROS ============ */
+const Filters = {
+  sel: {}, sig: "",
+  q: "",
+  apply(rows, P) { const q = this.q.trim().toLowerCase(); return rows.filter(r => P.filters.every(f => !this.sel[f] || !this.sel[f].size || vals(r, f).some(v => this.sel[f].has(v))) && (!q || Object.values(r).flat().join(" ").toLowerCase().includes(q))); },
+  build(recs, P) {
+    const opts = P.filters.map(f => [f, [...new Set(recs.flatMap(r => vals(r, f)))].sort(cmp)]);
+    const sig = JSON.stringify(opts); if (sig === this.sig) return; this.sig = sig;
+    P.filters.forEach(f => { if (this.sel[f]) this.sel[f] = new Set([...this.sel[f]].filter(v => opts.find(o => o[0] === f)[1].includes(v))); });
+    $("flt").innerHTML = opts.map(([f, o]) => '<details class="dd"><summary>' + esc(P.fields[f].l) + ' <b id="n_' + f + '" hidden></b></summary><div class="ddl">' +
+      o.map(v => '<label><input type="checkbox" data-f="' + f + '" data-v="' + esc(v) + '"' + (this.sel[f] && this.sel[f].has(v) ? " checked" : "") + "> " + esc(v) + "</label>").join("") + "</div></details>").join("") +
+      '<button class="btn" id="clr">Limpar filtros</button>';
+    this.badges(P);
+  },
+  badges(P) { P.filters.forEach(f => { const b = $("n_" + f); if (!b) return; const n = this.sel[f] ? this.sel[f].size : 0; b.hidden = !n; b.textContent = n; });
+    $("chips").innerHTML = P.filters.flatMap(f => [...(this.sel[f] || [])].map(v => '<span class="chip" data-f="' + f + '" data-v="' + esc(v) + '" title="Remover filtro">' + esc(P.fields[f].l) + ": " + esc(v) + "</span>")).join(""); }
+};
+
+/* ============ MÓDULO 9 · APLICATIVO (orquestra tudo) ============ */
+const App = {
+  P: null, recs: [], miss: [], stamp: 0, errs: null, cfg: null,
+  load() { try { return JSON.parse(localStorage.getItem("painel.cfg")); } catch (e) { return null; } },
+  save() { try { localStorage.setItem("painel.cfg", JSON.stringify(this.cfg)); } catch (e) {} },
+  start() {
+    const c = this.cfg; this.recs = []; this.stamp = 0; this.errs = null; Filters.sel = {}; Filters.sig = ""; $("flt").innerHTML = "";
+    $("grid").innerHTML = '<div class="empty wide">Carregando dados…</div>'; $("kpis").innerHTML = ""; this.status();
+    const base = PROFILES[c.profile];
+    Source.watch(c.sid, c.range, (v, t) => {
+      this.errs = null; this.stamp = Math.max(this.stamp, t);
+      this.P = base.auto ? Object.assign({}, buildAuto(v)) : base;
+      const r = parse(v, this.P); this.recs = r.recs; this.miss = r.miss;
+      $("ttl").textContent = this.P.title || "Painel";
+      Filters.build(this.recs, this.P); this.draw(); this.banner(); this.status();
+    }, e => { this.errs = e; this.banner(); this.status(); });
+  },
+  draw() {
+    charts.splice(0).forEach(ch => ch.destroy());
+    const P = this.P, rows = Filters.apply(this.recs, P), out = { kpis: [], grid: [] }, draws = [];
+    $("cnt").innerHTML = "Mostrando <b>" + nf.format(rows.length) + "</b> de " + nf.format(this.recs.length) + " registros";
+    if (!this.recs.length) { $("kpis").innerHTML = ""; $("grid").innerHTML = '<div class="empty wide">Nenhum registro encontrado. Confira aba, intervalo e perfil em “Fonte dos dados”.</div>'; return; }
+    P.widgets.forEach((w, n) => { const o = Widgets[w.t](w, rows, P, n); out[o.slot].push(o.html); if (o.draw) draws.push(o.draw); });
+    $("kpis").innerHTML = out.kpis.join(""); $("grid").innerHTML = out.grid.join("");
+    draws.forEach(d => d());
+  },
+  banner() {
+    const M = {
+      forbidden: "Sem permissão para ler a planilha. Compartilhe-a como “Qualquer pessoa com o link: Leitor” e confira a chave de API.",
+      not_found: "Planilha não encontrada. Confira o ID da planilha.",
+      bad_range: "Aba ou intervalo inválido. Confira o nome da aba e o intervalo.",
+      network: "Sem conexão com o Google Sheets. Mantendo os últimos dados.",
+      http: "Falha ao ler a planilha. Mantendo os últimos dados."
+    };
+    const e = this.errs;
+    let t = e ? (M[e.code] || "Falha temporária ao ler a planilha; mantendo os últimos dados.") : "";
+    if (!e && this.miss.length) t = "Colunas não encontradas neste perfil: " + this.miss.join(", ") + ".";
+    $("bn").innerHTML = t ? '<div class="banner">' + esc(t) + "</div>" : "";
+  },
+  status() {
+    const el = $("st");
+    el.className = this.stamp ? "pill ok" : "pill";
+    el.textContent = this.stamp ? "Atualizado às " + new Date(this.stamp).toLocaleTimeString("pt-BR") + " · sincroniza a cada " + SITE.pollMs / 1000 + " s" : "Conectando…";
+  },
+  async boot() {
+    $("prf").innerHTML = Object.entries(PROFILES).map(([k, p]) => '<option value="' + k + '">' + esc(p.label) + "</option>").join("");
+    const d = PROFILES.pap;
+    this.cfg = this.load() || { sid: d.spreadsheetId, range: d.range, profile: "pap" };
+    if (!PROFILES[this.cfg.profile]) this.cfg.profile = "pap";
+    $("sid").value = this.cfg.sid; $("rng").value = this.cfg.range; $("prf").value = this.cfg.profile;
+    $("prf").onchange = () => { const p = PROFILES[$("prf").value]; if (p.spreadsheetId) { $("sid").value = p.spreadsheetId; } if (p.range) $("rng").value = p.range; };
+    $("go").onclick = () => {
+      const m = $("sid").value.match(/\/d\/([\w-]+)/), sid = m ? m[1] : $("sid").value.trim(), range = $("rng").value.trim();
+      if (!sid || !range) { $("bn").innerHTML = '<div class="banner">Informe a planilha e o intervalo (ex.: Aba1!A1:Z).</div>'; return; }
+      this.cfg = { sid, range, profile: $("prf").value }; this.save(); this.start();
+    };
+    $("flt").addEventListener("change", e => {
+      const t = e.target; if (!t.dataset || !t.dataset.f) return;
+      const s = Filters.sel[t.dataset.f] || (Filters.sel[t.dataset.f] = new Set());
+      t.checked ? s.add(t.dataset.v) : s.delete(t.dataset.v);
+      Filters.badges(this.P); this.draw();
+    });
+    $("flt").addEventListener("click", e => { if (e.target.id === "clr") { Filters.sel = {}; Filters.sig = ""; Filters.build(this.recs, this.P); this.draw(); } });
+    $("chips").addEventListener("click", e => { const t = e.target; if (!t.dataset || !t.dataset.f) return; Filters.sel[t.dataset.f].delete(t.dataset.v); Filters.sig = ""; Filters.build(this.recs, this.P); this.draw(); });
+    $("q").addEventListener("input", e => { Filters.q = e.target.value; this.draw(); });
+    document.addEventListener("click", e => document.querySelectorAll(".dd[open]").forEach(d => { if (!d.contains(e.target)) d.removeAttribute("open"); }));
+    if (!(await Source.init())) { $("grid").innerHTML = '<div class="empty wide">Configure a chave de API em SITE.apiKey (veja o README.md).</div>'; $("st").textContent = "Chave de API não configurada"; return; }
+    this.start();
+  }
+};
+App.boot();
+</script>
+</body>
+</html>
