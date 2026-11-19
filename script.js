@@ -57,7 +57,7 @@ const PAP_PROFILE = {
     parcelas: { label: "Quantidade de parcelas", index: 36, type: "number" },
     observacoes: { label: "Observações", index: 37 }
   },
-  filters: ["territorio", "municipio", "lote", "cadeiaCarta", "genero", "agroprocessamento", "equipe", "analista", "status", "situacaoAnalise", "parecer"],
+  filters: ["territorio", "municipio", "lote", "cadeiaCarta", "genero", "agroprocessamento", "equipe", "analista", "status", "situacaoAnalise", "parecer", "dataEnvio", "dataPendencia", "dataRecebimento", "diasPendencia", "dataConclusao", "diasAnalise", "parcelas", "valorUnidade", "contrapartidaFinanceira", "contrapartidaMaoObra", "contrapartidaBens", "observacoes"],
   widgets: [
     { type: "kpi", title: "PAPs cadastrados", aggregate: "count" },
     { type: "kpi", title: "Sem classificação no status", aggregate: "count", where: { status: /^\.\.\.$/ } },
@@ -70,7 +70,9 @@ const PAP_PROFILE = {
     { type: "kpi", title: "Jovens (Carta)", aggregate: "sum", field: "jovensCarta" },
     { type: "kpi", title: "Valor proposto", aggregate: "sum", field: "proposto", format: "money" },
     { type: "kpi", title: "Valor aprovado", aggregate: "sum", field: "aprovado", format: "money" },
-    { type: "kpi", title: "Contrapartida total", aggregate: "sum", field: "contrapartidaFinanceira", format: "money" },
+    { type: "kpi", title: "Contrapartida financeira", aggregate: "sum", field: "contrapartidaFinanceira", format: "money" },
+    { type: "kpi", title: "Contrapartida: mão de obra", aggregate: "sum", field: "contrapartidaMaoObra", format: "money" },
+    { type: "kpi", title: "Contrapartida: bens e materiais", aggregate: "sum", field: "contrapartidaBens", format: "money" },
     { type: "pipeline", title: "Status geral dos PAPs", by: "status", wide: true },
     { type: "bar", title: "Situação das análises", by: "situacaoAnalise", horizontal: true },
     { type: "doughnut", title: "Resultado dos pareceres", by: "parecer" },
