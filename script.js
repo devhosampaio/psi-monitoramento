@@ -52,8 +52,8 @@ const PAP_PROFILE = {
     diasPendencia: { label: "Dias com pendências", index: 31, type: "number" },
     dataConclusao: { label: "Data de conclusão da análise", index: 32, type: "multi" },
     diasAnalise: { label: "Dias da análise", index: 33, type: "number" },
-    situacaoAnalise: { label: "Situação da análise", index: 34, options: ["Concluído", "Em análise", "Com pendência"] },
-    parecer: { label: "Resultado do parecer", index: 35, options: ["Aprovado", "Reprovado", "Aprovado com ressalvas"] },
+    situacaoAnalise: { label: "Situação da análise", index: 34, type: "multi", options: ["Concluído", "Em análise", "Com pendência"] },
+    parecer: { label: "Resultado do parecer", index: 35, type: "multi", options: ["Aprovado", "Reprovado", "Aprovado com ressalvas"] },
     parcelas: { label: "Quantidade de parcelas", index: 36, type: "number" },
     observacoes: { label: "Observações", index: 37, type: "multi" }
   },
@@ -355,7 +355,10 @@ function startMonitoring() {
 /* Agregações e renderização dos widgets individuais. */
 function aggregateRows(rows, widget) {
   return widget.where
-    ? rows.filter((row) => Object.entries(widget.where).every(([field, regex]) => regex.test(String(row[field] || ""))))
+    ? rows.filter((row) => Object.entries(widget.where).every(([field, regex]) => {
+      const values = Array.isArray(row[field]) ? row[field] : [row[field]];
+      return values.some((value) => regex.test(String(value || "")));
+    }))
     : rows;
 }
 function groupRows(rows, widget) {
@@ -495,10 +498,10 @@ function renderTeamSummary(rows) {
   const teams = ["Equipe 1", "Equipe 2", "Equipe 3", "Equipe 4", "Equipe 5"];
   const rowsHtml = teams.map((team) => {
     const assigned = rows.filter((row) => row.equipe === team);
-    const inAnalysis = assigned.filter((row) => row.situacaoAnalise === "Em análise").length;
-    const completed = assigned.filter((row) => row.situacaoAnalise === "Concluído").length;
-    const pending = assigned.filter((row) => row.situacaoAnalise === "Com pendência").length;
-    const awaiting = assigned.filter((row) => !row.situacaoAnalise || row.situacaoAnalise === NA).length;
+    const inAnalysis = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Em análise")).length;
+    const completed = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Concluído")).length;
+    const pending = assigned.filter((row) => valuesOf(row, "situacaoAnalise").includes("Com pendência")).length;
+    const awaiting = assigned.filter((row) => !row.situacaoAnalise || !row.situacaoAnalise.length).length;
     return `<tr><td><strong>${team}</strong></td><td>${assigned.length}</td><td>${inAnalysis}</td><td>${completed}</td><td>${pending}</td><td>${awaiting}</td></tr>`;
   }).join("");
   return `<article class="widget-card wide"><h3>Acompanhamento operacional por equipe</h3><div class="table-wrap"><table><thead><tr><th>Equipe</th><th>PAPs atribuídos</th><th>Em análise</th><th>Concluídos</th><th>Com pendências</th><th>Sem situação</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><p class="table-note">Contagens calculadas a partir dos campos Equipe de Análise e Situação da Análise.</p></article>`;
